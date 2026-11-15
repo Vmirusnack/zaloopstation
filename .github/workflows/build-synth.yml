@@ -2,6 +2,9 @@ name: Build Loop Synth
 
 on:
   push:
+    paths:
+      - 'synth/**'
+      - '.github/workflows/build-synth.yml'
   workflow_dispatch:
 
 jobs:
@@ -15,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S synth -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release --parallel

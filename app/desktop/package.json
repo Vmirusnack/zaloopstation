@@ -1,0 +1,26 @@
+{
+  "name": "loop-studio",
+  "productName": "Loop Studio",
+  "version": "1.0.0",
+  "description": "Loop Studio: a DAW for hardcore, hardstyle and techno",
+  "author": "Loop Studio",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.loopstudio.app",
+    "productName": "Loop Studio",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["electron/**", "www/**", "package.json"],
+    "win": { "target": ["nsis", "portable"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.music", "identity": null },
+    "artifactName": "${productName}-${version}-${os}.${ext}"
+  }
+}

@@ -1,26 +1,18 @@
-# Loop Synth
+# Loop Studio
 
-A wavetable synthesizer plugin (VST3) from the Loop Studio project.
-Two wavetable oscillators with unison, sub oscillator, Moog-style ladder filter, two envelopes, mono/glide mode and a distortion stage.
+A DAW for hardcore, hardstyle, uptempo, frenchcore and techno, plus a wavetable synth plugin.
 
-## Build (no software to install)
+| Folder | What it is | Workflow |
+|---|---|---|
+| `app/` | Loop Studio as an installable app: Windows (.exe installer and portable), macOS (.dmg), Android (.apk) | Build Loop Studio apps |
+| `synth/` | Loop Synth: a wavetable synth plugin (VST3, Windows and macOS) | Build Loop Synth |
 
-1. Upload these files to a GitHub repository (keep the folder structure, including `.github/workflows/build.yml`).
-2. Open the **Actions** tab. The build starts by itself (or press **Run workflow**).
-3. When the run is green, open it and download the **LoopSynth-Windows** (or **LoopSynth-macOS**) file from **Artifacts**.
-4. Windows: copy the folder `Loop Synth.vst3` into `C:\Program Files\Common Files\VST3`. macOS: copy it into `~/Library/Audio/Plug-Ins/VST3`.
-5. Rescan plugins in your DAW. `Loop Synth.exe` / `Loop Synth.app` is the same synth as a stand-alone program.
+Open the **Actions** tab, pick a finished run and download the files from **Artifacts**.
 
-## Sounds
-Choose a preset at the top right: Zaag Lead, Raw Screech, Sub Bass, Acid Squelch, Hoover Stack, Pluck.
+## Updating the app
+`app/www/index.html` is the whole DAW. Replace it with a new version and push: the apps are rebuilt automatically.
 
-## macOS note
-The plugin is not signed. If macOS refuses to load it, run once in Terminal:
-`xattr -cr ~/Library/Audio/Plug-Ins/VST3/"Loop Synth.vst3"`
-
-## Folder layout
-```
-CMakeLists.txt
-Source/        (Dsp.h, Params.h, PluginProcessor.*, PluginEditor.*)
-.github/workflows/build.yml
-```
+## Install notes
+- **Windows:** run `Loop Studio-...-win.exe` (installer) or the portable one. Windows SmartScreen may warn about an unsigned app: choose More info, Run anyway.
+- **macOS:** open the .dmg, drag Loop Studio to Applications. The app is unsigned: the first time, right-click it and choose Open.
+- **Android:** open the .apk on the phone and allow installing from this source. Play Protect may warn because the app is not from the store.

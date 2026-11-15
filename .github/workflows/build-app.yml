@@ -1,0 +1,75 @@
+name: Build Loop Studio apps
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-app.yml'
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app/desktop
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Copy the app page
+        shell: bash
+        run: mkdir -p www && cp ../www/index.html www/index.html
+      - name: Install
+        run: npm install
+      - name: Build
+        run: npx electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LoopStudio-${{ runner.os }}
+          path: |
+            app/desktop/dist/*.exe
+            app/desktop/dist/*.dmg
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Copy the app page
+        run: mkdir -p www && cp ../www/index.html www/index.html
+      - name: Install
+        run: npm install
+      - name: Create the Android project
+        run: npx cap add android
+      - name: Landscape only
+        run: |
+          sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:screenOrientation="sensorLandscape"/' android/app/src/main/AndroidManifest.xml
+          grep -n "screenOrientation" android/app/src/main/AndroidManifest.xml
+      - name: Copy page into the project
+        run: npx cap sync android
+      - name: Build APK
+        working-directory: app/android/android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LoopStudio-Android
+          path: app/android/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
