@@ -367,6 +367,7 @@ input[type=range].pl:focus-visible{outline:2px solid var(--accent);outline-offse
 #midiwin{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:58;background:var(--panel);border:1px solid var(--edge);border-radius:var(--r3);box-shadow:0 22px 60px rgba(0,0,0,.6);width:min(520px,calc(100vw - 20px));max-height:calc(100vh - 90px);overflow:auto}
 #midiwin[hidden]{display:none}#midiwin .cwh{cursor:default}
 .mdbody{padding:12px 14px;font-size:12px;line-height:1.5}.mdrow,.mdport{margin:3px 0}.mdok{color:#4ade80}.mdno{color:#f87171}.mdw{color:#fbbf24}
+.aimeter{flex:1;height:8px;background:var(--meterbg,#0f1113);border:1px solid #000;border-radius:3px;overflow:hidden}.aimeter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4ade80,#fbbf24 75%,#f87171)}
 .mdhint{margin:10px 0;padding:8px 10px;border-radius:8px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35)}
 .mdmon{margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.25);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}.mdmon .mdh{font-family:inherit;opacity:.7;margin-bottom:4px}.mdd{opacity:.5}
 .kbcv{display:block;width:100%;height:130px;border-radius:var(--r2);margin-top:8px;cursor:pointer}
@@ -619,6 +620,8 @@ input[type=range].pl:focus-visible{outline:2px solid var(--accent);outline-offse
     <tr><td>Wavetable Synth</td><td>Serum-style synth (inspired by it, not a copy). Two wavetable oscillators (built-in tables or your own .wav, 2048 samples per frame) with a morph Position, Warp (bend, sync, squeeze, mirror, FM, quantize) and up to 16 unison voices. Sub, noise, resonant filter, three envelopes (Env 1 is the amplitude), three LFOs and an 8-slot modulation matrix. Open it with <b>Open synth…</b> in the inspector; drag over a wave picture to move the position. <b>Kick:</b> choose a Kick preset, or use Env 2 → Pitch (all) at +70 to +90 % with a short decay, a sine or Wavefold table as the body, Voices = 1 and the Drive / Clip distortion.</td></tr>
     <tr><td>Rumble bus</td><td>In a track's inspector, under Sends, press <b>Rumble bus from this track</b> (use it on the kick). It creates a bus with a 100% wet reverb, a low-pass, saturation, a high-pass and a compressor keyed by that track, so the rumble swells between kicks. Tune it in the bus inserts: Reverb size sets the length, the low-pass cutoff sets the pitch range. The <b>Rumble Techno</b> template starts with this set up. For a single-plugin version, add the <b>Rumble</b> insert to the kick: the kick stays as it is and the rumble is added next to it, with Amount, Decay, Tune (pitch of the rumble), Low-pass, Drive and a built-in duck keyed by the kick.</td></tr>
     <tr><td>Acid Synth</td><td>Add a track with the instrument <b>Acid Synth (303)</b>: a mono bass line synth with a diode-ladder filter. Knobs: Tuning, Cutoff, Resonance, Env mod, Decay, Accent, Slide time, Distortion, Level. <b>Slide:</b> let a note run past the start of the next one and it glides into it. <b>Accent:</b> notes with velocity above about 108 are louder and open the filter harder. Pick a preset (Acid 303, square, squelch, dirty, overdriven) or press Open synth for the full engine. The <b>Acid Rave</b> template starts with a line like this.</td></tr>
+    <tr><td>Vocal recording</td><td>Add an <b>Audio Track</b>. In its inspector press <b>Enable microphone</b> (the browser asks once), choose the input, and watch the Level bar move. Then arm the track with <b>R</b>, press <b>Record</b> and <b>Play</b>: everything you sing is captured as raw sound and placed as a region where you started, moved earlier by the sound-card delay. Press Stop to finish the take. If takes sound late or early, change <b>Shift (ms)</b>. <b>Monitor</b> lets you hear yourself through the track (only with headphones, otherwise it howls). Record without effects and add Autotune afterwards.</td></tr>
+    <tr><td>Autotune</td><td>An insert plugin for one voice or one melody line at a time. It listens to the pitch, finds the nearest note of the chosen <b>Key</b> and <b>Scale</b> and pulls the sound there. <b>Retune speed</b>: 0 ms is the hard robotic effect, 40 to 100 ms is a natural correction, slower leaves more of the singing. <b>Amount</b> mixes how far to correct, <b>Flex</b> leaves notes that are already close, <b>Tuning</b> sets the reference pitch. The display shows the sung note, the note it is corrected to and the lit scale keys. It does not work on chords. Corrections of more than about a semitone sound processed.</td></tr>
     <tr><td>OTT</td><td>An insert plugin: a three-band upward and downward compressor (splits at 88 Hz and 2.5 kHz). It lifts quiet parts and pulls loud parts toward the middle in every band, which gives the dense, bright, "in your face" sound. <b>Depth</b> sets how hard, <b>Time</b> how slow, <b>Upward</b> and <b>Downward</b> set the two halves separately, <b>Low / Mid / High gain</b> shape the bands, <b>Mix</b> blends with the original (parallel). The bars show what each band is doing right now. Loud material is pulled down a lot, so raise <b>Output</b> to compensate. No delay.</td></tr>
     <tr><td>Moog Ladder</td><td>An insert plugin and a filter type in the Wavetable Synth (Moog ladder 24, Acid diode 18). Four saturating one-pole stages with feedback. Modes: LP 24, LP 18, LP 12, BP, HP 24. Env mod opens the cutoff with the input level, the LFO sweeps it. Mix blends with the dry signal.</td></tr>
     <tr><td>MIDI files</td><td>File → Import MIDI file… (or drop a .mid on the window) makes one track per MIDI track or channel, channel 10 becomes a drum track, and the tempo is taken when the project is empty. File → Export MIDI file writes every note track to a .mid (480 ticks per beat). In the claude.ai page the file arrives inside a ZIP.</td></tr>
@@ -723,7 +726,8 @@ function initAudio(){
   loadDist(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});
   loadLadder(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});
   loadKeyHarm(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});
-  loadOtt(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});   // compressors built before the engine was ready used the basic fallback
+  loadOtt(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});
+  loadTune(ctx).then(ok=>{if(ok&&ac===ctx)rebuildAllFx()});   // compressors built before the engine was ready used the basic fallback
 }
 function buildChain(t){
   if(!ac||t.ch)return;
@@ -852,9 +856,11 @@ function play(){
   initAudio();if(S.playing)return;if(typeof pvStop==='function')pvStop();
   S.playing=true;const start=S.pos;segs=[{ctx:ac.currentTime+.05,beat:start,spb:60/S.bpm}];
   schedBeat=start;FRESH=true;metroNext=Math.ceil(start-1e-9);timer=setInterval(tick,25);tick();uiTransport();
+  if(typeof audRecSync==='function')audRecSync();
 }
 function pause(){
   if(!S.playing)return;S.pos=curBeat();S.playing=false;clearInterval(timer);timer=null;stopAllVoices();flushRecNotes();endAutoWrites();if(ac){applyMix();autoFxStop()}uiTransport();
+  if(typeof audRecSync==='function')audRecSync();
 }
 function togglePlay(){S.playing?pause():play()}
 function stopBtn(){if(S.playing)pause();else{S.pos=S.cycle?S.cycleStart:0;panic(true)}uiTransport()}
@@ -1129,7 +1135,7 @@ function renderInspector(){
   <h4>Track</h4>
   <div class="row"><label>Name</label><input class="txt" id="iTn" value="${esc(t.name)}"></div>
   <div class="row"><label>Instrument</label><select class="sb" id="iTt">${Object.entries(TYPES).filter(([k])=>(k==='audio')===(t.type==='audio')).map(([k,v])=>`<option value="${k}"${k===typeKey(t)?' selected':''}>${v}</option>`).join('')}</select></div>
-  ${t.type==='audio'?'<div class="btnrow"><button class="mini" id="iAud">Add audio file…</button></div>':''}
+  ${t.type==='audio'?'<div class="btnrow"><button class="mini" id="iAud">Add audio file…</button></div>'+audInputHtml(t):''}
   ${hasWave?`<div class="row"><label>Waveform</label><select class="sb" id="iTw">${['sawtooth','square','triangle','sine'].map(w=>`<option${w===t.wave?' selected':''}>${w}</option>`).join('')}</select></div>`:''}
   ${t.type!=='drums'&&t.type!=='slicer'&&t.type!=='audio'&&!isHardType(t)?`<div class="row"><label>Cutoff</label><input type="range" id="iTc" min="0" max="1" step=".01" value="${t.cutoff}"></div>
   <div class="row"><label>Release</label><input type="range" id="iTr" min=".03" max="2.5" step=".01" value="${t.rel}"></div>`:''}
@@ -1169,7 +1175,7 @@ function renderInspector(){
   on('iAm','change',e=>{pushUndo();t.autoMode=e.target.value;t._wr=null;t._resync=true;if(ac){applyMix();autoFxApply(t)}if(S.autoView)drawAutoAll();changed()});
   on('iAc','click',()=>{pushUndo();t.auto={vol:[],pan:[]};t._resync=true;if(ac){applyMix();autoFxApply(t)}drawAutoAll();changed()});
   on('iM','click',()=>{t.mute=!t.mute;mixChanged()});on('iS','click',()=>{t.solo=!t.solo;mixChanged()});on('iA','click',()=>{S.tracks.forEach(x=>x.arm=false);t.arm=!t.arm;mixChanged()});on('iPh','click',()=>{pushUndo();t.phase=!t.phase;applyMix();renderInspector();changed()});
-  mountInst(t);bindMidi(t,r);on('iTx','click',()=>deleteTrack(t));renderFx(t);bindSends(t);on('iAud','click',()=>pickAudio(t));if(t.type==='drums')bindDrummer(t,r);
+  mountInst(t);bindMidi(t,r);on('iTx','click',()=>deleteTrack(t));renderFx(t);bindSends(t);on('iAud','click',()=>pickAudio(t));if(t.type==='audio')bindAudInput(t);if(t.type==='drums')bindDrummer(t,r);
 }
 function addTrack(type){
   pushUndo();const t=newTrack(type);S.tracks.push(t);if(ac){buildChain(t);applyMix()}S.selTrack=t.id;S.selRegion=null;renderAll();changed();
@@ -1629,6 +1635,7 @@ function makeFx(ctx,fx){
   else if(fx.type==='ladder'){inst=makeLadder(ctx,offline,fx.p,set,val)}
   else if(fx.type==='keyharm'){inst=makeKeyHarm(ctx,offline,fx.p,set,val)}
   else if(fx.type==='ott'){inst=makeOtt(ctx,offline,fx.p,set,val)}
+  else if(fx.type==='tune'){inst=makeTune(ctx,offline,fx.p,set,val)}
   else if(fx.type==='eq'){
     const ls=ctx.createBiquadFilter(),m1=ctx.createBiquadFilter(),m2=ctx.createBiquadFilter(),hs=ctx.createBiquadFilter();
     ls.type='lowshelf';m1.type='peaking';m2.type='peaking';hs.type='highshelf';ls.connect(m1);m1.connect(m2);m2.connect(hs);
@@ -1696,13 +1703,14 @@ const fxVal=(d,x)=>d.log?d.min*Math.pow(d.max/d.min,x):d.min+x*(d.max-d.min);
 function fxFmt(d,v){
   switch(d.u){case 'hz':return v>=1000?(v/1000).toFixed(v>=10000?1:2)+'k':String(Math.round(v));
     case 'db':return (v>0?'+':'')+v.toFixed(1);case 'ms':return Math.round(v)+' ms';case 'pct':return Math.round(v*100)+'%';
-    case 'q':return v.toFixed(2);case 'ratio':return v.toFixed(1)+':1';case 's':return v.toFixed(1)+' s';case 'hzr':return v.toFixed(2)+' Hz'}
+    case 'q':return v.toFixed(2);case 'ct':return (v>0?'+':'')+Math.round(v)+' ct';case 'ratio':return v.toFixed(1)+':1';case 's':return v.toFixed(1)+' s';case 'hzr':return v.toFixed(2)+' Hz'}
   return String(v);
 }
 function fxParamsBody(t,fx){
   const def=FX_DEFS[fx.type],body=document.createElement('div');body.className='fxp';
   if(fx.type==='keyharm')return khPanel(t,fx);
   if(fx.type==='ott')body.appendChild(ottDisplay(t,fx));
+  if(fx.type==='tune')body.appendChild(tuneDisplay(t,fx));
   def.params.forEach(d=>{
       const row=document.createElement('div'),v=fx.p[d.k]===undefined?d.def:fx.p[d.k];row.className='fxrow';
       if(d.opts){
@@ -2284,7 +2292,7 @@ function loadComp(ctx){
   p=p.catch(()=>tryUrl('data:application/javascript;base64,'+btoa(unescape(encodeURIComponent(COMP_WK)))));   // a page policy may refuse blob: modules
   return ctx._lscP=p.then(()=>{ctx._lsc=true;return true}).catch(e=>{console.warn('Compressor worklet unavailable, using the basic compressor',e);return false});
 }
-function rebuildAllFx(){[...S.tracks,...S.buses,MASTER].forEach(t=>{if((t.fx||[]).some(f=>f.type==='comp'||f.type==='hdist'||f.type==='rumble'||f.type==='ladder'||f.type==='keyharm'||f.type==='ott'))rebuildFx(t)})}
+function rebuildAllFx(){[...S.tracks,...S.buses,MASTER].forEach(t=>{if((t.fx||[]).some(f=>f.type==='comp'||f.type==='hdist'||f.type==='rumble'||f.type==='ladder'||f.type==='keyharm'||f.type==='ott'||f.type==='tune'))rebuildFx(t)})}
 const compDef=k=>FX_DEFS.comp.params.find(x=>x.k===k).def;
 function compParams(p){
   const v=k=>p[k]===undefined?compDef(k):p[k];
@@ -2778,7 +2786,7 @@ async function renderBuffer(a,b,opt){
   opt=opt||{};await strAll();const spb=60/S.bpm,sr=(ac&&ac.sampleRate)||44100,len=Math.ceil(((b-a)*spb+3)*sr);
   const sv={ac,master,comp,masterAn,revIn,noiseBuf,MCH,kL,kR},svCh=S.tracks.map(t=>t.ch),svBus=S.buses.map(x=>x.ch),svVoices=[...voices],svLast=Object.assign({},LAST),svFx=S.masterFx;
   try{
-    const off=new OfflineAudioContext(2,len,sr);await loadComp(off);await loadWt(off);await loadDist(off);await loadLadder(off);await loadKeyHarm(off);await loadOtt(off);await loadKickPack(off);voices.clear();for(const k in LAST)delete LAST[k];
+    const off=new OfflineAudioContext(2,len,sr);await loadComp(off);await loadWt(off);await loadDist(off);await loadLadder(off);await loadKeyHarm(off);await loadOtt(off);await loadTune(off);await loadKickPack(off);voices.clear();for(const k in LAST)delete LAST[k];
     if(opt.noMaster)S.masterFx=[];
     useGraph(off,makeGraph(off));master.gain.value=fg(S.master);S.buses.forEach(x=>{x.ch=null});S.tracks.forEach(t=>{t.ch=null;buildChain(t)});applyMix(true);
     S.tracks.forEach(t=>scheduleAuto(t,a,b,x=>(x-a)*spb,true));
@@ -6856,6 +6864,290 @@ function ottDisplay(t,fx){
   requestAnimationFrame(draw);
   return wrap;
 }
+/* ============ Vocal / audio recording ============
+   Arm an audio track (R), press Record, then Play: the microphone is captured as raw samples and placed as a region where recording began,
+   moved earlier by the sound-card delay so the take lines up with the beat. */
+const AREC={stream:null,src:null,node:null,mon:null,sink:null,active:false,track:null,chunks:[],n:0,startBeat:null,t0:null,dev:'',monitor:false,offMs:0,devices:[],level:0,want:false,
+  pk:0,ready:false,err:''};
+try{const o=JSON.parse(localStorage.getItem('loopstudio.audrec')||'{}');AREC.dev=o.dev||'';AREC.monitor=!!o.monitor;AREC.offMs=+o.offMs||0}catch(e){}
+function audRecSave(){try{localStorage.setItem('loopstudio.audrec',JSON.stringify({dev:AREC.dev,monitor:AREC.monitor,offMs:AREC.offMs}))}catch(e){}}
+
+function recEngine(AudioWorkletProcessor,registerProcessor){
+  class LSREC extends AudioWorkletProcessor{
+    constructor(){super();this.on=false;this.n=0;this.buf=new Float32Array(4096);this.t0=-1;this.pk=0;this.pn=0;
+      this.port.onmessage=e=>{if(e.data==='start'){this.on=true;this.n=0;this.t0=-1}else if(e.data==='stop'){this.flush();this.on=false}}}
+    flush(){if(this.n>0){this.port.postMessage({c:this.buf.slice(0,this.n),t0:this.t0});this.n=0}}
+    process(inp,out){
+      const x=inp[0]&&inp[0][0];if(!x)return true;
+      let m=0;for(let i=0;i<x.length;i++){const a=x[i]<0?-x[i]:x[i];if(a>m)m=a}
+      if(m>this.pk)this.pk=m;this.pn+=x.length;
+      if(this.pn>=2400){this.port.postMessage({pk:this.pk});this.pk=0;this.pn=0}
+      if(this.on){
+        if(this.t0<0)this.t0=currentTime;
+        for(let i=0;i<x.length;i++){this.buf[this.n++]=x[i];if(this.n>=4096){this.port.postMessage({c:this.buf.slice(),t0:this.t0});this.t0=-2;this.n=0}}
+      }
+      return true;
+    }
+  }
+  registerProcessor('ls-rec',LSREC);
+}
+const REC_WK='('+recEngine.toString()+')(AudioWorkletProcessor,registerProcessor);';
+function loadRec(ctx){
+  if(ctx._lsrP)return ctx._lsrP;
+  if(!ctx.audioWorklet)return ctx._lsrP=Promise.resolve(false);
+  let p;
+  try{const url=URL.createObjectURL(new Blob([REC_WK],{type:'application/javascript'}));p=ctx.audioWorklet.addModule(url).finally(()=>URL.revokeObjectURL(url))}catch(e){p=Promise.reject(e)}
+  p=p.catch(()=>ctx.audioWorklet.addModule('data:application/javascript;base64,'+btoa(unescape(encodeURIComponent(REC_WK)))));
+  return ctx._lsrP=p.then(()=>true).catch(e=>{console.warn('Recorder worklet unavailable',e);return false});
+}
+
+const audArmed=()=>S.tracks.find(t=>t.arm&&t.type==='audio')||null;
+
+async function audInputOpen(){
+  initAudio();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){AREC.err='This browser cannot use a microphone here';return false}
+  if(!await loadRec(ac)){AREC.err='The recorder could not start';return false}
+  audInputClose();
+  try{
+    const c={echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1};if(AREC.dev)c.deviceId={exact:AREC.dev};
+    AREC.stream=await navigator.mediaDevices.getUserMedia({audio:c});
+  }catch(e){
+    if(AREC.dev){AREC.dev='';audRecSave();return audInputOpen()}
+    AREC.err=e&&e.name==='NotAllowedError'?'Microphone access was refused. Allow it in the address bar (lock icon), then try again':'No microphone found ('+(e&&e.name||'error')+')';return false}
+  AREC.err='';
+  const ctx=ac;AREC.src=ctx.createMediaStreamSource(AREC.stream);
+  AREC.node=new AudioWorkletNode(ctx,'ls-rec',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1,channelCountMode:'explicit'});
+  AREC.sink=ctx.createGain();AREC.sink.gain.value=0;AREC.src.connect(AREC.node);AREC.node.connect(AREC.sink);AREC.sink.connect(ctx.destination);
+  AREC.node.port.onmessage=e=>{
+    const d=e.data;if(d.pk!==undefined){AREC.pk=Math.max(AREC.pk*.0,d.pk);AREC.level=d.pk}
+    if(d.c&&AREC.active){
+      if(AREC.t0===null&&d.t0>=0){AREC.t0=d.t0;AREC.startBeat=audBeatAt(d.t0)}
+      AREC.chunks.push(d.c);AREC.n+=d.c.length;
+    }
+  };
+  audMonitorApply();
+  try{AREC.devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput')}catch(e){AREC.devices=[]}
+  AREC.ready=true;return true;
+}
+function audInputClose(){
+  try{AREC.node&&AREC.node.disconnect();AREC.src&&AREC.src.disconnect();AREC.sink&&AREC.sink.disconnect();AREC.mon&&AREC.mon.disconnect()}catch(e){}
+  if(AREC.stream)AREC.stream.getTracks().forEach(t=>t.stop());
+  AREC.stream=AREC.src=AREC.node=AREC.sink=AREC.mon=null;AREC.ready=false;
+}
+function audMonitorApply(){
+  if(!AREC.src)return;
+  try{AREC.mon&&AREC.mon.disconnect()}catch(e){}AREC.mon=null;
+  const t=audArmed()||S.tracks.find(x=>x.type==='audio');
+  if(AREC.monitor&&t&&t.ch){AREC.mon=ac.createGain();AREC.mon.gain.value=1;AREC.src.connect(AREC.mon);AREC.mon.connect(t.ch.in)}
+}
+function audBeatAt(time){
+  let sg=segs[0];for(const s of segs)if(s.ctx<=time)sg=s;return sg.beat+(time-sg.ctx)/sg.spb;
+}
+function audLatency(){   // seconds the take arrives late: what the singer hears is delayed by the output, then the input adds its own delay
+  const out=ac.outputLatency||ac.baseLatency||0,inn=(AREC.stream&&AREC.stream.getAudioTracks()[0]&&AREC.stream.getAudioTracks()[0].getSettings().latency)||ac.baseLatency||0;
+  return Math.max(0,Math.min(.4,out+inn))+AREC.offMs/1000;
+}
+async function audRecStart(){
+  const t=audArmed();if(!t||AREC.active)return;
+  if(!AREC.ready&&!await audInputOpen()){toast(AREC.err||'Recording not possible');S.rec=false;uiTransport();return}
+  if(!S.playing||!S.rec||audArmed()!==t)return;
+  AREC.chunks=[];AREC.n=0;AREC.t0=null;AREC.startBeat=null;AREC.track=t;AREC.active=true;AREC.node.port.postMessage('start');
+  if(typeof renderAll==='function')renderAll();
+}
+function audRecStop(){
+  if(!AREC.active)return;
+  AREC.active=false;AREC.node&&AREC.node.port.postMessage('stop');
+  const t=AREC.track;AREC.track=null;
+  // the last chunk arrives a moment after the stop message
+  setTimeout(()=>audRecFinish(t),120);
+}
+function audRecFinish(t){
+  const n=AREC.n;if(!n||AREC.startBeat===null||!t){AREC.chunks=[];AREC.n=0;return}
+  const sr=ac.sampleRate,buf=ac.createBuffer(1,n,sr),d=buf.getChannelData(0);let p=0;for(const c of AREC.chunks){d.set(c,p);p+=c.length}
+  AREC.chunks=[];AREC.n=0;
+  if(n<sr*.15)return;
+  pushUndo();
+  const spb=60/S.bpm,lat=audLatency();let start=AREC.startBeat-lat/spb,off=0;
+  if(start<0){off=-start*spb;start=0}
+  const dur=buf.duration-off,len=Math.max(.25,Math.ceil(dur/spb*4)/4);
+  const w=encodeWav(buf,0,true),id=uid++,nm='Take '+((t.regions.filter(r=>r.clip).length)+1);
+  AUD[id]=mkClip(buf,w.data,nm+'.wav');idbPut('aud'+id,w.data);
+  const r=newRegion(start,len,nm);r.clip=id;r.clipName=nm+'.wav';r.off=off;r.gain=0;t.regions.push(r);
+  const over=t.regions.some(x=>x!==r&&start<x.start+x.len&&start+len>x.start);
+  S.selTrack=t.id;S.selBus=null;S.selRegion=r.id;renderAll();selectRegion(r);changed();
+  toast('Recorded '+dur.toFixed(1)+' s, shifted '+Math.round(lat*1000)+' ms earlier for the sound-card delay'+(over?'. It overlaps another region: mute or delete one of them':''));
+}
+function audRecSync(){
+  const want=S.rec&&S.playing&&!!audArmed();
+  if(want&&!AREC.active)audRecStart();else if(!want&&AREC.active)audRecStop();
+}
+
+/* inspector section of an audio track */
+function audInputHtml(t){
+  return `<h4>Audio input</h4>
+  <div class="btnrow"><button class="mini" id="aiOpen">${AREC.ready?'Microphone on':'Enable microphone'}</button></div>
+  <div class="row"><label>Input</label><select class="sb" id="aiDev"><option value="">Default</option>${AREC.devices.map(d=>`<option value="${esc(d.deviceId)}"${d.deviceId===AREC.dev?' selected':''}>${esc(d.label||'Input')}</option>`).join('')}</select></div>
+  <div class="row"><label>Level</label><div class="aimeter"><i id="aiLvl"></i></div></div>
+  <div class="row"><label>Monitor</label><input type="checkbox" id="aiMon"${AREC.monitor?' checked':''}></div>
+  <div class="row"><label>Shift (ms)</label><input class="txt" id="aiOff" type="number" step="5" value="${AREC.offMs}"></div>
+  <div class="hint" id="aiHint">${esc(AREC.err)||'To record: arm this track with R, press Record, then Play. Use headphones when monitoring. If the take sounds late, increase Shift.'}</div>`;
+}
+let audMeterTimer=null;
+function bindAudInput(t){
+  const $$=id=>document.getElementById(id);if(!$$('aiOpen'))return;
+  $$('aiOpen').onclick=async()=>{const ok=await audInputOpen();$$('aiOpen').textContent=ok?'Microphone on':'Enable microphone';if($$('aiHint'))$$('aiHint').textContent=ok?'Microphone ready. Sing something: the level bar should move.':AREC.err;if(ok)renderInspector&&renderInspector()};
+  $$('aiDev').onchange=async e=>{AREC.dev=e.target.value;audRecSave();if(AREC.ready)await audInputOpen()};
+  $$('aiMon').onchange=e=>{AREC.monitor=e.target.checked;audRecSave();audMonitorApply()};
+  $$('aiOff').onchange=e=>{AREC.offMs=+e.target.value||0;audRecSave()};
+  clearInterval(audMeterTimer);
+  audMeterTimer=setInterval(()=>{const el=document.getElementById('aiLvl');if(!el){clearInterval(audMeterTimer);return}el.style.width=Math.min(100,Math.round(Math.sqrt(AREC.level)*100))+'%';AREC.level*=.7},60);
+}
+/* ============ Autotune: pitch correction for a solo voice or instrument ============
+   Finds the pitch of the sound (YIN), picks the nearest note of the chosen scale and pulls the sound there with a delay-line pitch shifter.
+   Retune speed 0 gives the hard robotic effect, slower values keep the singing natural. Works on one voice at a time (not on chords). */
+function tuneEngine(AudioWorkletProcessor,registerProcessor,sampleRate){
+  const DEC=2,W=640,TAUMAX=320,HOP=512,DL=16384,MASK=2047;
+  class LSTUNE extends AudioWorkletProcessor{
+    constructor(o){
+      super();this.P=(o.processorOptions||{}).p||{mask:[1,1,1,1,1,1,1,1,1,1,1,1]};
+      this.dl=[new Float32Array(DL),new Float32Array(DL)];this.w=0;this.dbuf=new Float32Array(2048);this.dw=0;this.dacc=0;this.dn=0;
+      this.hop=0;this.f=0;this.fh=[0,0,0];this.unv=99;this.curN=null;this.tgt=0;this.s=0;this.D=.025*sampleRate;this.Dt=this.D;this.ph=0;this.msg=0;this.m=0;
+      this.x=new Float32Array(W+TAUMAX+4);this.d=new Float32Array(TAUMAX+2);
+      this.port.onmessage=e=>{if(e.data&&e.data.p)this.P=e.data.p};
+    }
+    yin(){
+      const srd=sampleRate/DEC,x=this.x,d=this.d,P=this.P;
+      const total=W+TAUMAX;for(let i=0;i<total;i++)x[i]=this.dbuf[(this.dw-total+i)&MASK];
+      let e=0;for(let i=0;i<W;i++)e+=x[i]*x[i];if(Math.sqrt(e/W)<.004)return 0;
+      const tmin=Math.max(8,Math.floor(srd/1000)),tmax=Math.min(TAUMAX-1,Math.floor(srd/(P.lo||70)));
+      d[0]=1;let run=0;
+      for(let t=1;t<=tmax;t++){let s=0;for(let j=0;j<W;j++){const q=x[j]-x[j+t];s+=q*q}run+=s;d[t]=run>0?s*t/run:1}
+      let best=-1;
+      for(let t=tmin;t<=tmax-1;t++){if(d[t]<.15){while(t+1<=tmax-1&&d[t+1]<d[t])t++;best=t;break}}
+      if(best<0){let mv=1,mt=-1;for(let t=tmin;t<=tmax-1;t++)if(d[t]<mv){mv=d[t];mt=t}if(mt>0&&mv<.3)best=mt}
+      if(best<0)return 0;
+      const a=d[best-1],b=d[best],c=d[best+1],den=a-2*b+c;let tp=best;if(den>1e-9)tp=best+.5*(a-c)/den;
+      return srd/tp;
+    }
+    process(inp,outs){
+      const out=outs[0],inn=inp[0];if(!out||!out[0])return true;
+      const n=out[0].length,P=this.P,sr=sampleRate,mask=P.mask;
+      if(!inn||!inn.length||!inn[0]){for(const ch of out)ch.fill(0);return true}
+      const nc=Math.min(2,out.length),x0=inn[0],x1=inn[1]||inn[0],dl=this.dl;
+      const aSm=P.speed>.5?1-Math.exp(-1/(P.speed*.001*sr)):1-Math.exp(-1/(.003*sr)),mix=P.mix,ref=Math.pow(2,P.ref/1200);
+      for(let i=0;i<n;i++){
+        const a=x0[i],b=x1[i],w=this.w;dl[0][w]=a;dl[1][w]=b;
+        // pitch detection on a decimated mono copy
+        this.dacc+=(a+b)*.5;if(++this.dn>=DEC){this.dbuf[this.dw]=this.dacc/DEC;this.dw=(this.dw+1)&MASK;this.dacc=0;this.dn=0}
+        if(++this.hop>=HOP){this.hop=0;this.estimate(ref,mask,P)}
+        // smooth the correction and move the two read taps
+        this.s+=(this.tgt-this.s)*aSm;
+        const ratio=Math.pow(2,this.s/12);
+        this.D+=Math.max(-.001,Math.min(.001,this.Dt-this.D));
+        const D=this.D;this.ph+=(1-ratio)/D;this.ph-=Math.floor(this.ph);
+        const p1=this.ph,p2=p1+.5>=1?p1-.5:p1+.5,w1=Math.sin(Math.PI*p1),w2=Math.sin(Math.PI*p2),g1=w1*w1,g2=w2*w2;
+        const d1=2+p1*D,d2=2+p2*D,dd=2+D*.5;
+        for(let c=0;c<nc;c++){
+          const buf=dl[c];
+          const rd=dly=>{let r=w-dly;const i0=Math.floor(r),f=r-i0;const k0=((i0%DL)+DL)%DL,k1=(k0+1)%DL;return buf[k0]*(1-f)+buf[k1]*f};
+          const wet=rd(d1)*g1+rd(d2)*g2,dry=rd(dd);
+          out[c][i]=dry*(1-mix)+wet*mix;
+        }
+        this.w=(w+1)%DL;
+      }
+      for(let c=nc;c<out.length;c++)out[c].set(out[0]);
+      this.msg+=n;if(this.msg>=sr*.05){this.msg=0;this.port.postMessage({f:this.f,n:this.curN===null?-1:this.curN,s:this.s,m:this.m})}
+      return true;
+    }
+    estimate(ref,mask,P){
+      const f=this.yin();
+      if(f>0){
+        this.fh.shift();this.fh.push(f);this.unv=0;
+        const h=this.fh.filter(v=>v>0).sort((a,b)=>a-b);this.f=h[h.length>>1];
+      }else{this.unv++;if(this.unv>3){this.f=0;this.fh=[0,0,0]}}
+      if(this.f<=0){this.tgt=0;this.Dt=.025*sampleRate;return}
+      const m=69+12*Math.log2(this.f/(440*ref));this.m=m;
+      const ok=n=>mask[((n%12)+12)%12]>0;
+      let best=null,bd=99;const r=Math.round(m);
+      for(let k=-6;k<=6;k++){const n=r+k;if(ok(n)){const dd=Math.abs(m-n);if(dd<bd){bd=dd;best=n}}}
+      if(best===null)best=r;
+      if(this.curN!==null&&ok(this.curN)&&Math.abs(m-this.curN)<=bd+.25)best=this.curN;
+      this.curN=best;
+      let diff=best-m;if(Math.abs(diff)*100<P.flex)diff=0;diff*=P.amount;
+      this.tgt=Math.max(-6,Math.min(6,diff));
+      const T=sampleRate/this.f,k=2*Math.max(1,Math.round(.0125*this.f));
+      this.Dt=Math.max(.012*sampleRate,Math.min(.04*sampleRate,k*T));
+    }
+  }
+  registerProcessor('ls-tune',LSTUNE);
+}
+const TUNE_WK='('+tuneEngine.toString()+')(AudioWorkletProcessor,registerProcessor,sampleRate);';
+function loadTune(ctx){
+  if(ctx._lstP)return ctx._lstP;
+  if(!ctx.audioWorklet||typeof AudioWorkletNode==='undefined')return ctx._lstP=Promise.resolve(false);
+  let p;
+  try{const url=URL.createObjectURL(new Blob([TUNE_WK],{type:'application/javascript'}));p=ctx.audioWorklet.addModule(url).finally(()=>URL.revokeObjectURL(url))}catch(e){p=Promise.reject(e)}
+  p=p.catch(()=>ctx.audioWorklet.addModule('data:application/javascript;base64,'+btoa(unescape(encodeURIComponent(TUNE_WK)))));
+  const live=!(typeof OfflineAudioContext!=='undefined'&&ctx instanceof OfflineAudioContext);
+  const to=new Promise(res=>setTimeout(()=>res('timeout'),live?8000:20000));
+  p.then(()=>{if(!ctx._lst){ctx._lst=true;if(live&&typeof ac!=='undefined'&&ac===ctx){try{rebuildAllFx()}catch(e){}}}}).catch(()=>{});
+  return ctx._lstP=Promise.race([p.then(()=>'ok'),to]).then(r=>{if(r==='ok'){ctx._lst=true;return true}return false}).catch(e=>{console.warn('Autotune worklet unavailable',e);return false});
+}
+const TUNE_SCALES=['Chromatic',...Object.keys(KH_SCALES).filter(k=>k!=='Chromatic')];
+FX_DEFS.tune={name:'Autotune',params:[
+  {k:'key',label:'Key',def:'C',opts:KH_KEYS},
+  {k:'scale',label:'Scale',def:'Chromatic',opts:TUNE_SCALES},
+  {k:'speed',label:'Retune speed',min:0,max:400,def:60,u:'ms'},
+  {k:'amount',label:'Amount',min:0,max:1,def:1,u:'pct'},
+  {k:'flex',label:'Flex',min:0,max:50,def:8,u:'ct'},
+  {k:'ref',label:'Tuning',min:-50,max:50,def:0,u:'ct'},
+  {k:'mix',label:'Mix',min:0,max:1,def:1,u:'pct'}]};
+function tuneCfg(p,val){
+  const v=k=>val(p,k),sc=v('scale'),iv=sc==='Chromatic'?[0,1,2,3,4,5,6,7,8,9,10,11]:(KH_SCALES[sc]||[0,2,4,5,7,9,11]),root=Math.max(0,KH_KEYS.indexOf(v('key'))),mask=new Array(12).fill(0);
+  iv.forEach(i=>mask[(root+i)%12]=1);
+  return {mask,speed:v('speed'),amount:v('amount'),flex:v('flex'),ref:v('ref'),mix:v('mix'),lo:70};
+}
+function makeTune(ctx,offline,fxp,set,val){
+  if(ctx._lst){
+    const n=new AudioWorkletNode(ctx,'ls-tune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',processorOptions:{p:tuneCfg(fxp,val)}});
+    const o={in:n,out:n,worklet:true,stat:null,update(p){n.port.postMessage({p:tuneCfg(p,val)})},dispose(){try{n.disconnect()}catch(e){}}};
+    if(!offline)n.port.onmessage=e=>{const d=e.data;if(d&&d.f!==undefined)o.stat={f:d.f,n:d.n,s:d.s,m:d.m,t:performance.now()}};
+    return o;
+  }
+  const g=ctx.createGain();return {in:g,out:g,fallback:true,update(){}};
+}
+const TUNE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const tuneNote=n=>n<0?'–':TUNE_NAMES[((n%12)+12)%12]+(Math.floor(n/12)-1);
+/* shows the note being sung, the note it is pulled to and the scale keys */
+function tuneDisplay(t,fx){
+  const wrap=document.createElement('div');wrap.className='khd';
+  const cv=document.createElement('canvas');cv.className='khc';wrap.appendChild(cv);
+  const draw=()=>{
+    if(!cv.isConnected)return;requestAnimationFrame(draw);
+    const dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
+    const pw=Math.round(w*dpr),ph=Math.round(h*dpr);if(cv.width!==pw||cv.height!==ph){cv.width=pw;cv.height=ph}
+    const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#0d0f15';g.fillRect(0,0,w,h);
+    const inst=t.ch&&t.ch.fx&&t.ch.fx.find(f=>f.id===fx.id),st=inst&&inst.stat&&performance.now()-inst.stat.t<1500?inst.stat:null;
+    const cfg=tuneCfg(fx.p,(p,k)=>p[k]===undefined?FX_DEFS.tune.params.find(d=>d.k===k).def:p[k]);
+    // keyboard strip with the scale notes lit
+    const ky=h-26,kw=(w-20)/12;
+    for(let i=0;i<12;i++){const blk=[1,3,6,8,10].includes(i),on=cfg.mask[i]>0,act=st&&st.n>=0&&((st.n%12)+12)%12===i;
+      g.fillStyle=act?'#ffd35c':on?(blk?'#7a5fd0':'#b28cff'):(blk?'#1c1f2a':'#2a2e3d');g.fillRect(10+i*kw+1,ky,kw-2,22);
+      g.fillStyle=on?'#fff':'rgba(255,255,255,.35)';g.font='9px "IBM Plex Mono",ui-monospace,monospace';g.textAlign='center';g.textBaseline='middle';g.fillText(TUNE_NAMES[i],10+i*kw+kw/2,ky+11)}
+    g.textAlign='center';g.textBaseline='alphabetic';
+    if(st&&st.f>0){
+      const cents=(st.m-Math.round(st.m))*100;
+      g.fillStyle='#fff';g.font='700 26px "IBM Plex Mono",ui-monospace,monospace';g.fillText(tuneNote(Math.round(st.m)),w*.28,44);
+      g.fillStyle='rgba(255,255,255,.5)';g.font='10px "IBM Plex Mono",ui-monospace,monospace';g.fillText('sung '+st.f.toFixed(0)+' Hz',w*.28,60);
+      g.fillStyle='#ffd35c';g.font='700 26px "IBM Plex Mono",ui-monospace,monospace';g.fillText(tuneNote(st.n),w*.72,44);
+      g.fillStyle='rgba(255,255,255,.5)';g.font='10px "IBM Plex Mono",ui-monospace,monospace';g.fillText('corrected to ('+(st.s>0?'+':'')+(st.s*100).toFixed(0)+' ct)',w*.72,60);
+      g.fillStyle='rgba(255,255,255,.55)';g.fillText('→',w*.5,40);
+    }else{g.fillStyle='rgba(255,255,255,.4)';g.font='11px "IBM Plex Mono",ui-monospace,monospace';g.fillText(inst&&inst.fallback?'':'sing or play one note at a time',w/2,44)}
+    if(inst&&inst.fallback){g.fillStyle='#ff7a7a';g.font='10px "IBM Plex Mono",ui-monospace,monospace';g.fillText('ENGINE NOT LOADED: sound passes unchanged',w/2,44)}
+  };
+  requestAnimationFrame(draw);
+  return wrap;
+}
 /* ============ Kick Builder ============
    A kick is built from layers (punch, tail, click, transient, crunch, rumble). Each layer is synthesised or comes from a sample
    (the Zaag pack or your own file). The layers are mixed, distorted (at double sample rate), tuned and loudness-matched, then cached as one
@@ -7713,7 +8005,7 @@ const pianoKey=e=>{const c=e.code||'';return /^Key[A-Z]$/.test(c)?c[3].toLowerCa
 let ZXF=0;   // zoom as the wheel asks for it; S.zx is that value rounded to whole physical pixels
 const KEYMAP={a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12,o:13,l:14,p:15,';':16};
 function toggleCycle(){S.cycle=!S.cycle;uiTransport();if(S.playing){const b=curBeat();pause();S.pos=b;play()}}
-function toggleRec(){S.rec=!S.rec;uiTransport();if(S.rec&&!S.typing){S.typing=true;uiTransport();toast('Record on. Musical Typing enabled: play with A W S E D F T G Y H U J K')}}
+function toggleRec(){S.rec=!S.rec;uiTransport();if(typeof audRecSync==='function')audRecSync();if(S.rec&&!S.typing&&!audArmed()){S.typing=true;uiTransport();toast('Record on. Musical Typing enabled: play with A W S E D F T G Y H U J K')}}
 function toggleTyping(){S.typing=!S.typing;uiTransport();toast(S.typing?'Musical Typing on. A W S E D F T G Y H U J K, Z/X = octave':'Musical Typing off')}
 function showMenu(anchor,items){
   document.querySelectorAll('.menu').forEach(m=>m.remove());
