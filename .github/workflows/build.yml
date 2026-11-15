@@ -1,0 +1,41 @@
+name: Build Loop Synth
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item -Recurse "build/LoopSynth_artefacts/Release/VST3/*" out/
+          Copy-Item -Recurse "build/LoopSynth_artefacts/Release/Standalone/*" out/ -ErrorAction SilentlyContinue
+
+      - name: Collect (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p out
+          cp -R build/LoopSynth_artefacts/Release/VST3/* out/
+          cp -R build/LoopSynth_artefacts/Release/Standalone/* out/ || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LoopSynth-${{ runner.os }}
+          path: out
