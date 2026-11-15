@@ -42,3 +42,26 @@ jobs:
         with:
           name: LoopSynth-${{ runner.os }}
           path: out
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+      - name: Zip
+        run: |
+          mkdir -p out
+          for d in files/*; do n=$(basename "$d"); (cd "$d" && zip -qr "$GITHUB_WORKSPACE/out/$n.zip" .); done
+          ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: synth-latest
+          name: Loop Synth plugin (latest build)
+          body: |
+            Latest build of the Loop Synth plugin (VST3 plus stand-alone program).
+            Unzip, copy the Loop Synth.vst3 folder into your VST3 folder and rescan plugins in your DAW.
+          files: out/*
