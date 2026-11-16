@@ -1,5 +1,26 @@
 <title>Loop Studio</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" id="vpMeta" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>
+/* Phone detection runs before the first paint so the compact layout never flashes. */
+(function(){
+  var de=document.documentElement,meta=document.getElementById('vpMeta');
+  function pref(){try{var d=JSON.parse(localStorage.getItem('loopstudio.prefs')||'null');return (d&&d.layout)||'auto'}catch(e){return 'auto'}}
+  function coarse(){try{return matchMedia('(pointer:coarse)').matches}catch(e){return false}}
+  window.phoneCheck=function(){
+    var m=pref(),h=innerHeight,w=innerWidth,c=coarse();
+    var on=m==='phone'||(m==='auto'&&(h<=560||(c&&w<=1100&&h<=700)));
+    var was=de.classList.contains('phone');
+    de.classList.toggle('phone',on);de.classList.toggle('touchdev',c||on);
+    if(meta&&c){ // small touch screens: lay the page out ~1000 px wide, like a desktop window, so it keeps its proportions
+      var longSide=Math.max(screen.width,screen.height),sc=on?Math.min(1,longSide/1000):1;sc=Math.round(sc*1000)/1000;
+      var want='width=device-width,initial-scale='+sc+',minimum-scale='+sc+',maximum-scale='+sc+',user-scalable=no,viewport-fit=cover';
+      if(meta.getAttribute('content')!==want)meta.setAttribute('content',want);
+    }
+    return on!==was};
+  phoneCheck();
+})();
+</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout: one desktop DAW window — top transport bar, inspector left, arrange centre, editor/mixer drawer below. */
@@ -407,6 +428,87 @@ input[type=range].pl:focus-visible{outline:2px solid var(--accent);outline-offse
 .wmm{display:grid;gap:5px}.wmr{display:grid;grid-template-columns:minmax(80px,1fr) minmax(100px,1.2fr) minmax(90px,1.4fr) 44px;gap:8px;align-items:center}
 .wmv{font:11px var(--mono);color:var(--dim);text-align:right}
 @media(max-width:620px){.wmr{grid-template-columns:1fr 1fr}.wmr input[type=range]{grid-column:1/2}}
+/* ============ Phone / touch layout (class "phone" on <html>) ============ */
+#bExpand,#bEdit{display:none}
+.phone #bExpand,.phone #bEdit{display:inline-flex}
+.phone body{padding:0 env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+.touchdev{touch-action:manipulation}
+.phone #app{border:0;border-radius:0;box-shadow:none;grid-template-rows:42px minmax(0,1fr)}
+.phone #top{gap:6px;padding:0 8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.phone #top::-webkit-scrollbar{display:none}
+.phone .tb{height:32px;padding:0 10px}
+.phone .tb.sq{width:38px;padding:0}
+.phone #bRollBtn,.phone #bMixBtn,.phone #bTyping,.phone #lufs,.phone #lcd .cell:nth-child(n+3),.phone #lcd2 .cell:nth-child(2){display:none}
+.phone .lcd{height:34px}.phone .lcd .cell{padding:0 8px}
+.phone .lcd .val,.phone .lcd input{font-size:16px}.phone .lcd input{width:44px}
+.phone #mMeter{width:56px;height:26px}
+.phone #masterVol{width:64px!important}
+.phone #master{gap:5px}
+.phone .mini{height:30px;min-width:32px;padding:0 9px;font-size:12px}
+.phone .sb,.phone .num,.phone .txt{height:32px}
+.phone input[type=range]{min-height:28px}
+/* layout of the working area */
+.phone #main{grid-template-columns:minmax(0,1fr)}
+.phone #insp{display:block;position:fixed;left:0;top:42px;bottom:0;width:min(340px,46vw);z-index:60;box-shadow:8px 0 26px rgba(0,0,0,.55);border-right:1px solid var(--edge);padding-left:calc(12px + env(safe-area-inset-left,0px));-webkit-overflow-scrolling:touch}
+.phone #insp.off{display:none}
+.phone #arrange{grid-template-columns:214px minmax(0,1fr)}
+.phone #addTrack{padding:0 6px;white-space:nowrap}
+.phone #hdrTop{padding:0 5px;flex-wrap:nowrap;gap:4px}
+.phone #hdrTop>span,.phone #zoomArr{display:none}
+.phone #hdrTop .sb{width:52px!important;height:30px!important}
+.phone #hdrTop #bTool{width:78px!important}
+.phone #hdrTop .mini{height:30px;padding:0 7px}
+.phone .th .body{padding:4px 8px}
+.phone .th .btns{gap:5px}
+.phone .th .btns .mini{width:34px;height:26px;padding:0}
+.phone .th .nm span.t{display:none}
+.phone .region .rz,.phone .region .rl{width:22px}
+.phone #cyc i{width:22px}
+.phone #laneScroll{-webkit-overflow-scrolling:touch}
+.phone #split{height:14px;display:flex;align-items:center;justify-content:center}
+.phone #split::after{content:"";width:46px;height:4px;border-radius:2px;background:var(--edge)}
+.phone .tabs{height:38px;gap:5px;padding:0 6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.phone .tabs::-webkit-scrollbar{display:none}
+.phone .tabs>*{flex:none}
+.phone .tabs .sp{flex:1 0 6px}
+.phone .tabs .tb{height:30px;padding:0 9px}
+.phone #rollInfo{display:none}
+.phone .strip-ch{width:86px;padding:6px 4px;gap:5px}
+.phone .strip-ch .pan{width:70px}
+.phone .strip-ch .bnc{display:none}
+.phone .strip-ch>*{flex-shrink:0}
+.phone .strip-ch .fad{flex:1 0 84px;min-height:84px}
+.phone .strip-ch .grm,.phone .strip-ch .kro{display:none}
+.phone .strip-ch .name{font-size:12px;padding:4px 2px}
+.phone .strip-ch .ins .islot{min-height:24px}
+.phone .fdr{width:46px}
+.phone .row{grid-template-columns:76px minmax(0,1fr);margin:6px 0}
+.phone #insp .row label{font-size:12px}
+.phone .menu{max-height:calc(100vh - 12px);overflow:auto}
+.phone .menu>*{min-height:34px}
+.phone #help .card{max-height:calc(100vh - 24px);overflow:auto}
+/* floating plug-in windows must fit on the small screen */
+.phone #eqwin,.phone #cwin,.phone #fxwin,.phone #midiwin,.phone #wtwin,.phone #dswin,.phone #kbwin{top:4px!important;max-height:calc(100vh - 8px);overflow:auto;width:min(1010px,calc(100vw - 12px));-webkit-overflow-scrolling:touch}
+.phone #fxwin{right:6px;left:auto;transform:none}
+.phone #appear{top:4px;bottom:4px;right:4px}
+.phone .dlgwrap>*{max-height:calc(100vh - 16px);overflow:auto}
+/* start page */
+.phone #welcome{padding:10px 14px 12px}
+.phone #welcome .wh{margin-bottom:8px;gap:10px}
+.phone #welcome .wh h1{font-size:20px}
+.phone #welcome .wg{grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) minmax(0,1fr);gap:10px}
+.phone #welcome .wc{padding:10px;gap:6px}
+.phone .wbtn{padding:7px 10px}
+.phone .wbtn b{font-size:13px}.phone .wbtn span{font-size:10.5px}
+.phone .wtpl{grid-template-columns:1fr 1fr;gap:6px}
+.phone .wtpl .wbtn .wti{height:34px}
+.phone .wtpl .wbtn .wtt{padding:5px 8px 6px}
+.phone .wsub{margin:10px 0 6px}
+.phone .wthemes{gap:5px}
+.phone .tprev{height:32px}
+.phone #welcome .wf{margin-top:8px}
+.phone .wmr{grid-template-columns:1fr 1fr}
+@media (max-width:560px){.phone #welcome .wg{grid-template-columns:1fr}}
 </style>
 <div id="app">
   <header id="top">
@@ -519,6 +621,17 @@ input[type=range].pl:focus-visible{outline:2px solid var(--accent);outline-offse
     <tr><td>R</td><td>Record (plays notes you type into the selected track)</td></tr>
     <tr><td>C</td><td>Cycle on/off (drag the yellow bar in the ruler to set the range)</td></tr>
     <tr><td>K</td><td>Metronome</td></tr>
+  </table>
+  <h5>Phone and touch screens</h5>
+  <table>
+    <tr><td>Tap</td><td>Select; with the Pencil tool tap the piano roll to add a note</td></tr>
+    <tr><td>Drag in the piano roll</td><td>Move or resize notes; drag on empty space to select several</td></tr>
+    <tr><td>Two fingers in the piano roll</td><td>Move the view; pinch to zoom</td></tr>
+    <tr><td>Two fingers on the tracks</td><td>Pinch to zoom</td></tr>
+    <tr><td>Press and hold a region, then drag</td><td>Move it (a quick swipe scrolls the tracks). Double-tap a region to open it in the piano roll</td></tr>
+    <tr><td>Press and hold a note</td><td>Delete it</td></tr>
+    <tr><td>Arrow button on the editor tabs</td><td>Make the editor full height and back</td></tr>
+    <tr><td>Start page → Layout</td><td>Auto, Phone (compact) or Desktop</td></tr>
   </table>
   <h5>Logic Pro key commands (Windows: Cmd = Ctrl, Option = Alt)</h5>
   <table>
@@ -1241,10 +1354,10 @@ function layoutBottom(){
   $('bRollBtn').classList.toggle('on',bottomOpen&&bottomMode==='roll');$('bMixBtn').classList.toggle('on',bottomOpen&&bottomMode==='mix');
   const h=bottomOpen?bottomH:0;$('bottom').style.height=h+'px';requestAnimationFrame(()=>{resizeRoll();renderRoll();resizeSlicer();renderSlicer()});
 }
-let bottomH=Math.round(window.innerHeight*.42);
+let bottomH=Math.round(window.innerHeight*(document.documentElement.classList.contains('phone')?.55:.42));
 /* ============ Piano roll (canvas) ============ */
 const R={px:56,ph:15,x0:-.25,top:72,sel:new Set(),tool:'ptr',snap:.25,live:new Set(),lastLen:.5,W:0,H:0,dpr:1,band:null,region:null};
-const KW=64,RH=22,VH=72;
+let KW=64,RH=22,VH=72;
 const rb=()=>$('rollBody');
 const curRegion=()=>findRegion(S.selRegion);
 const gridH=()=>R.H-RH-VH;
@@ -4015,10 +4128,10 @@ BUILTIN.forEach(t=>Object.freeze(t));
 const FONTS={plex:["'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif",'IBM Plex Sans'],system:["system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",'System'],mono:["'IBM Plex Mono',ui-monospace,Consolas,monospace",'Monospace']};
 const LANE_H={56:'Compact',68:'Normal',92:'Large'};
 
-const PREF={abuf:'balanced',eco:false,ui:'full',theme:'loop-dark',custom:[],welcome:true,shape:{r:5,font:'plex',fs:12,flat:false,lh:68},start:{tempo:100,metro:false,insp:true,bottom:'roll',snap:4}};
+const PREF={abuf:'balanced',eco:false,ui:'full',layout:'auto',theme:'loop-dark',custom:[],welcome:true,shape:{r:5,font:'plex',fs:12,flat:false,lh:68},start:{tempo:100,metro:false,insp:true,bottom:'roll',snap:4}};
 function loadPrefs(){
   try{const d=JSON.parse(localStorage.getItem('loopstudio.prefs')||'null');if(!d)return;
-    if(typeof d.theme==='string')PREF.theme=d.theme;if(Array.isArray(d.custom))PREF.custom=d.custom.filter(validTheme);PREF.welcome=d.welcome!==false;if(typeof d.meter==='string')PREF.meter=d.meter;if(['fast','balanced','safe'].includes(d.abuf))PREF.abuf=d.abuf;PREF.eco=!!d.eco;PREF.ui=d.ui==='hard'?'hard':'full';
+    if(typeof d.theme==='string')PREF.theme=d.theme;if(Array.isArray(d.custom))PREF.custom=d.custom.filter(validTheme);PREF.welcome=d.welcome!==false;if(typeof d.meter==='string')PREF.meter=d.meter;if(['fast','balanced','safe'].includes(d.abuf))PREF.abuf=d.abuf;PREF.eco=!!d.eco;PREF.ui=d.ui==='hard'?'hard':'full';if(['auto','phone','desktop'].includes(d.layout))PREF.layout=d.layout;
     Object.assign(PREF.shape,d.shape||{});Object.assign(PREF.start,d.start||{})}catch(e){}
 }
 function savePrefs(){try{localStorage.setItem('loopstudio.prefs',JSON.stringify(PREF))}catch(e){}}
@@ -4071,7 +4184,7 @@ function applyTheme(){
   for(const k in d.css)st.setProperty('--'+k,d.css[k]);
   st.colorScheme=d.light?'light':'dark';Object.assign(TH,d.th);
   COLORS.splice(0,COLORS.length,...((t.tc&&t.tc.length===8&&t.tc.every(x=>HEXRE.test(x)))?t.tc:DEFAULT_TC));
-  if(LH!==PREF.shape.lh){LH=PREF.shape.lh}
+  if(document.documentElement.classList.contains('phone')){st.setProperty('--lh','50px');LH=50}else if(LH!==PREF.shape.lh){LH=PREF.shape.lh}
   if(READY)redrawThemed();
 }
 function redrawThemed(){
@@ -4422,7 +4535,7 @@ function loadFrom(d){
 /* the "set it up my way" choices apply to every new empty or template project */
 function applyStartPrefs(){
   const st=PREF.start;S.metro=!!st.metro;S.snapArr=+st.snap;$('snapArr').value=String(S.snapArr);
-  $('insp').classList.toggle('off',!st.insp);$('bInsp').classList.toggle('on',!!st.insp);
+  {const on=!!st.insp&&!document.documentElement.classList.contains('phone');$('insp').classList.toggle('off',!on);$('bInsp').classList.toggle('on',on)}
   const b=S.bottom||st.bottom;
   if(b==='closed')bottomOpen=false;else{bottomOpen=true;bottomMode=['roll','mix','slice','steps'].includes(b)?b:'roll'}
   setTimeout(()=>{resizeRoll();renderRoll()},0);
@@ -4460,6 +4573,7 @@ function renderWelcome(){
     <div class="row"><label>Inspector</label><input type="checkbox" id="wInsp"${st.insp?' checked':''} aria-label="Show the inspector"></div>
     <div class="row"><label>Bottom panel</label><select class="sb" id="wBot"><option value="roll"${st.bottom==='roll'?' selected':''}>Piano Roll</option><option value="mix"${st.bottom==='mix'?' selected':''}>Mixer</option><option value="closed"${st.bottom==='closed'?' selected':''}>Closed</option></select></div>
     <div class="row"><label>Interface</label><select class="sb" id="wUi"><option value="full"${PREF.ui!=='hard'?' selected':''}>Full</option><option value="hard"${PREF.ui==='hard'?' selected':''}>Hard dance (minimal)</option></select></div>
+    <div class="row"><label>Layout</label><select class="sb" id="wLay"><option value="auto"${PREF.layout==='auto'?' selected':''}>Auto</option><option value="phone"${PREF.layout==='phone'?' selected':''}>Phone (compact, touch)</option><option value="desktop"${PREF.layout==='desktop'?' selected':''}>Desktop</option></select></div>
     <div class="row"><label>Track height</label><select class="sb" id="wLh">${Object.entries(LANE_H).map(([k,v])=>`<option value="${k}"${+k===PREF.shape.lh?' selected':''}>${v}</option>`).join('')}</select></div>
    </section>
   </div>
@@ -4483,6 +4597,7 @@ function bindWelcome(){
   q('wInsp').onchange=e=>{st.insp=e.target.checked;savePrefs()};
   q('wBot').onchange=e=>{st.bottom=e.target.value;savePrefs()};
   q('wUi').onchange=e=>{PREF.ui=e.target.value;savePrefs();applyUi()};
+  q('wLay').onchange=e=>{PREF.layout=e.target.value;savePrefs();if(window.phoneCheck)window.phoneCheck();if(window.phoneApply)window.phoneApply(true)};
   q('wLh').onchange=e=>{setShape('lh',+e.target.value)};
   q('wShow').onchange=e=>{PREF.welcome=e.target.checked;savePrefs()};
 }
@@ -8043,8 +8158,8 @@ function bind(){
   $('hdrRows').addEventListener('wheel',e=>{$('laneScroll').scrollTop+=e.deltaY},{passive:true});
   $('laneScroll').addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();ZXF=clamp((ZXF||S.zx)*Math.exp(-e.deltaY*.0025),10,90);S.zx=ZXF;$('zoomArr').value=S.zx;applyZoom()}},{passive:false});
   $('split').addEventListener('mousedown',e=>{const y0=e.clientY,h0=bottomH;e.preventDefault();
-    dragWin(ev=>{bottomH=clamp(h0-(ev.clientY-y0),120,window.innerHeight-200);$('bottom').style.height=bottomH+'px';resizeRoll();renderRoll()})});
-  window.addEventListener('resize',()=>{bottomH=clamp(bottomH,120,Math.max(160,window.innerHeight-200));layoutBottom()});
+    dragWin(ev=>{bottomH=clamp(h0-(ev.clientY-y0),document.documentElement.classList.contains('phone')?90:120,window.innerHeight-(document.documentElement.classList.contains('phone')?100:200));$('bottom').style.height=bottomH+'px';resizeRoll();renderRoll()})});
+  window.addEventListener('resize',()=>{bottomH=clamp(bottomH,90,Math.max(130,window.innerHeight-(document.documentElement.classList.contains('phone')?100:200)));layoutBottom()});
   window.addEventListener('beforeunload',()=>{try{localStorage.setItem('loopstudio.v1',snapshot())}catch(e){}});
   $('rollBody').addEventListener('mousedown',()=>{focusArea='roll'});
 
@@ -8103,4 +8218,147 @@ function frame(){frameN++;
 /* ============ Start ============ */
 initTheme();loadProject();$('tempo').value=S.bpm;$('masterVol').value=S.master;
 bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSamples();loadAudioClips();kbRestoreSamples();autoMidi();requestAnimationFrame(frame);initControls();READY=true;initWelcome();
+</script>
+<script>
+/* ============ Phone mode: compact layout + touch editing ============
+   The editors were written for a mouse (mousedown / mousemove / mouseup on window). A finger only produces
+   those events for a tap, so this bridge turns touches on the editing surfaces into the same mouse events. */
+(function(){
+  const de=document.documentElement,G=id=>document.getElementById(id);
+  const isPh=()=>de.classList.contains('phone');
+  const IMMEDIATE='#rollBody,#ruler,#split,#slCv,.acv,.rz,.rl,#cyc';   // a finger drag edits right away
+  const LONG='.region';                                                // long-press, then drag (a quick swipe still scrolls)
+  const WHEELED='#rollBody,#slCv';                                     // two fingers: pan + pinch zoom
+  let T=null,GS=null,lastTap={t:0,x:0,y:0,el:null},skip=false;
+
+  function mouse(type,x,y,o){return new MouseEvent(type,Object.assign({bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,screenX:x,screenY:y,button:0,buttons:(type==='mouseup'||type==='click'||type==='dblclick')?0:1,detail:type==='dblclick'?2:1},o||{}))}
+  const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}};
+  const wake=()=>{try{if(typeof initAudio==='function')initAudio();if(typeof ac!=='undefined'&&ac&&ac.state==='suspended')ac.resume()}catch(e){}};
+  const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+  function startDrag(el,x,y){T.down=true;T.el=el;el.dispatchEvent(mouse('mousedown',x,y))}
+  function moveTo(x,y){const u=document.elementFromPoint(x,y)||window;u.dispatchEvent(mouse('mousemove',x,y))}
+  function endDrag(x,y){if(!T||!T.down)return;T.down=false;const u=document.elementFromPoint(x,y)||window;u.dispatchEvent(mouse('mouseup',x,y))}
+  function clearT(){if(T){if(T.timer)clearTimeout(T.timer);if(T.timer0)clearTimeout(T.timer0)}T=null}
+  function flush(){ // a finger that stays down starts the edit; a second finger arriving within a moment cancels it (pan / pinch)
+    if(!T||T.down||T.dead)return;if(T.timer0){clearTimeout(T.timer0);T.timer0=null}
+    startDrag(T.el,T.x0,T.y0);if(T.x!==T.x0||T.y!==T.y0)moveTo(T.x,T.y)}
+
+  document.addEventListener('touchstart',e=>{
+    const ts=e.touches;
+    if(ts.length>=2){
+      if(T){endDrag(T.x,T.y);clearT()}
+      const a=ts[0],b=ts[1],cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2,u=document.elementFromPoint(cx,cy),w=u&&u.closest(WHEELED+',#laneScroll');
+      skip=true;
+      if(w){GS={kz:w.matches(WHEELED)?.002:.0025,el:w,cx,cy,d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1,roll:w.matches(WHEELED)};if(GS.roll)e.preventDefault()}
+      return}
+    skip=false;if(T)clearT();
+    const t=ts[0],el=e.target&&e.target.closest?e.target.closest(IMMEDIATE+','+LONG):null;if(!el)return;
+    wake();
+    const imm=el.matches(IMMEDIATE)||(e.target.closest&&e.target.closest(IMMEDIATE));
+    T={x:t.clientX,y:t.clientY,x0:t.clientX,y0:t.clientY,t0:Date.now(),el:e.target,imm:!!imm,down:false,moved:false,timer:null};
+    if(imm){e.preventDefault();T.timer0=setTimeout(flush,60);
+      T.timer=setTimeout(()=>{if(T&&!T.moved){flush();buzz();T.el.dispatchEvent(mouse('contextmenu',T.x,T.y,{button:2,buttons:2}));endDrag(T.x,T.y);T.dead=true}},650)}
+    else{ // region: wait for a long press
+      T.timer=setTimeout(()=>{if(T&&!T.moved){buzz();startDrag(T.el,T.x,T.y);T.long=true}},280)}
+  },{passive:false,capture:true});
+
+  document.addEventListener('touchmove',e=>{
+    const ts=e.touches;
+    if(GS&&ts.length>=2){
+      const a=ts[0],b=ts[1],cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2,d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1;
+      const dx=cx-GS.cx,dy=cy-GS.cy,k=d/GS.d,el=GS.el,send=(o)=>el.dispatchEvent(new WheelEvent('wheel',Object.assign({bubbles:true,cancelable:true,clientX:cx,clientY:cy,deltaMode:0},o)));
+      if(Math.abs(k-1)>.004){send({deltaY:-Math.log(k)/GS.kz,ctrlKey:true});GS.d=d}
+      if(GS.roll){if(Math.abs(dx)>=1)send({deltaX:-dx});if(Math.abs(dy)>=1)send({deltaY:-dy});e.preventDefault()}
+      GS.cx=cx;GS.cy=cy;return}
+    if(!T||skip)return;const t=ts[0];if(!t)return;
+    const moved=near({x:t.clientX,y:t.clientY},{x:T.x0,y:T.y0});
+    if(moved>9){T.moved=true;if(T.timer&&!T.imm){clearTimeout(T.timer);T.timer=null}}
+    if(T.imm&&moved>9&&T.timer){clearTimeout(T.timer);T.timer=null}
+    T.x=t.clientX;T.y=t.clientY;
+    if(T.dead)return;
+    if(T.imm&&!T.down&&moved>9)flush();
+    if(T.down){moveTo(t.clientX,t.clientY);if(e.cancelable)e.preventDefault()}
+    else if(T.imm&&e.cancelable)e.preventDefault();
+  },{passive:false,capture:true});
+
+  function finish(e){
+    const rest=e.touches?e.touches.length:0;
+    if(GS&&rest<2){GS=null}
+    if(!T)return;
+    if(rest>0&&skip)return;
+    const t=e.changedTouches&&e.changedTouches[0],x=t?t.clientX:T.x,y=t?t.clientY:T.y,dur=Date.now()-T.t0,tap=!T.moved&&dur<420&&e.type==='touchend';
+    wake();
+    if(T.imm&&!T.down&&!T.dead)flush();
+    if(T.down){endDrag(x,y)}
+    if(tap&&!T.dead){
+      const now=Date.now(),twice=now-lastTap.t<360&&near(lastTap,{x,y})<32&&lastTap.el===T.el;
+      if(T.imm){if(twice){T.el.dispatchEvent(mouse('dblclick',x,y));lastTap.t=0}else lastTap={t:now,x,y,el:T.el}}
+      else{ // region: the quick tap was handled by the browser (select); a second tap opens the editor
+        if(twice){if(e.cancelable)e.preventDefault();T.el.dispatchEvent(mouse('dblclick',x,y));lastTap.t=0}else lastTap={t:now,x,y,el:T.el}}
+    }
+    if(T.imm&&e.cancelable&&e.type==='touchend')e.preventDefault();
+    clearT();
+  }
+  document.addEventListener('touchend',finish,{passive:false,capture:true});
+  document.addEventListener('touchcancel',e=>{if(T&&T.down)endDrag(T.x,T.y);clearT();GS=null},{capture:true});
+  document.addEventListener('contextmenu',e=>{if(e.isTrusted&&e.target.closest&&e.target.closest('.region,#rollBody,#ruler,.th'))e.preventDefault()},true);
+
+  /* ---- layout helpers ---- */
+  const lb=window.layoutBottom;
+  function botMax(){return Math.max(110,window.innerHeight-(isPh()?100:200))}
+  function syncButtons(){
+    const e=G('bEdit');if(e)e.classList.toggle('on',typeof bottomOpen!=='undefined'&&bottomOpen);
+    const x=G('bExpand');if(x){const full=bottomH>=botMax()-4;x.textContent=full?'⤡':'⤢';x.title=full?'Show the tracks again':'Make the editor full height'}
+  }
+  let rollH=null,lastMode='roll';
+  window.layoutBottom=function(){
+    if(isPh()&&typeof bottomH!=='undefined'){
+      if(bottomMode!==lastMode){ // the mixer, slicer and lists need the room: give them the full height, restore the roll size after
+        if(lastMode==='roll')rollH=bottomH;
+        if(bottomMode==='roll'){if(rollH)bottomH=rollH}else if(lastMode==='roll')bottomH=botMax();
+        lastMode=bottomMode}
+      bottomH=Math.min(bottomH,botMax())}
+    lb.apply(this,arguments);syncButtons();
+  };
+  function rollMetrics(){
+    if(isPh()){KW=46;RH=18;VH=46;R.ph=Math.max(R.ph,17)}else{KW=64;RH=22;VH=72}
+  }
+  let lastPh=null;
+  function apply(force){
+    const ph=isPh();if(!force&&ph===lastPh)return;lastPh=ph;
+    rollMetrics();
+    bottomH=Math.round(window.innerHeight*(ph?.55:.42));
+    if(ph){G('insp').classList.add('off');G('bInsp').classList.remove('on')}
+    try{applyTheme()}catch(e){}
+    layoutBottom();
+    try{resizeRoll();renderRoll()}catch(e){}
+  }
+  // buttons only the phone layout shows
+  const tabs=document.querySelector('.tabs');
+  if(tabs&&!G('bExpand')){
+    const x=document.createElement('button');x.className='tb sq';x.id='bExpand';x.textContent='⤢';x.title='Make the editor full height';
+    tabs.insertBefore(x,tabs.firstChild);
+    x.onclick=()=>{const full=bottomH>=botMax()-4;bottomH=full?Math.round(window.innerHeight*.55):botMax();layoutBottom()};
+  }
+  const bi=G('bInsp');
+  if(bi&&!G('bEdit')){
+    const b=document.createElement('button');b.className='tb on';b.id='bEdit';b.textContent='Editor';b.title='Show or hide the editor below the tracks';
+    bi.parentNode.insertBefore(b,bi.nextSibling);
+    b.onclick=()=>{toggleBottom(bottomMode);syncButtons()};
+  }
+  // tapping outside the inspector closes it on the phone
+  document.addEventListener('pointerdown',e=>{
+    if(!isPh())return;const i=G('insp');if(!i||i.classList.contains('off'))return;
+    if(i.contains(e.target)||e.target.closest('#bInsp')||e.target.closest('.menu,.dlgwrap,#wtwin,#dswin,#kbwin,#eqwin,#cwin,#fxwin'))return;
+    i.classList.add('off');G('bInsp').classList.remove('on');setTimeout(()=>{resizeRoll();renderRoll()},0);
+  },true);
+  // the split bar is easier to hit when it is bigger; it already uses mousedown, which the bridge feeds
+  let rz=null;
+  window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{const ch=window.phoneCheck&&window.phoneCheck();if(ch)apply(true);else{syncButtons()}},120)});
+  window.addEventListener('orientationchange',()=>setTimeout(()=>window.dispatchEvent(new Event('resize')),250));
+  window.phoneApply=apply;
+  apply(true);
+})();
+
 </script>
