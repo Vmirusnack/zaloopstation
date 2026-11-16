@@ -12,9 +12,8 @@
     var on=m==='phone'||(m==='auto'&&(h<=560||(c&&w<=1100&&h<=700)));
     var was=de.classList.contains('phone');
     de.classList.toggle('phone',on);de.classList.toggle('touchdev',c||on);
-    if(meta&&c){ // small touch screens: lay the page out ~1000 px wide, like a desktop window, so it keeps its proportions
-      var longSide=Math.max(screen.width,screen.height),sc=on?Math.min(1,longSide/1000):1;sc=Math.round(sc*1000)/1000;
-      var want='width=device-width,initial-scale='+sc+',minimum-scale='+sc+',maximum-scale='+sc+',user-scalable=no,viewport-fit=cover';
+    if(meta&&c){ // touch screens: lay out at the real screen width and never let the page pan sideways
+      var want='width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
       if(meta.getAttribute('content')!==want)meta.setAttribute('content',want);
     }
     return on!==was};
@@ -490,7 +489,10 @@ input[type=range].pl:focus-visible{outline:2px solid var(--accent);outline-offse
 /* floating plug-in windows must fit on the small screen */
 .phone #eqwin,.phone #cwin,.phone #fxwin,.phone #midiwin,.phone #wtwin,.phone #dswin,.phone #kbwin{top:4px!important;max-height:calc(100vh - 8px);overflow:auto;width:min(1010px,calc(100vw - 12px));-webkit-overflow-scrolling:touch}
 .phone #fxwin{right:6px;left:auto;transform:none}
-.phone #appear{top:4px;bottom:4px;right:4px}
+.phone #appear{top:4px;bottom:4px;right:4px;width:min(316px,calc(100vw - 8px))}
+html.phone,html.phone body{width:100%;max-width:100%;overflow:hidden;overscroll-behavior:none}
+html.phone body{position:fixed;inset:0}
+.phone #eqwin,.phone #cwin,.phone #fxwin,.phone #midiwin,.phone #wtwin,.phone #dswin,.phone #kbwin{max-width:calc(100% - 8px)}
 .phone .dlgwrap>*{max-height:calc(100vh - 16px);overflow:auto}
 /* start page */
 .phone #welcome{padding:10px 14px 12px}

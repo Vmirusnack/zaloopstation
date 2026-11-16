@@ -2,5 +2,6 @@
   "appId": "com.loopstudio.app",
   "appName": "Loop Studio",
   "webDir": "www",
+  "backgroundColor": "#141518",
   "server": { "androidScheme": "https" }
 }
