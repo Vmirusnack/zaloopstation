@@ -5175,6 +5175,7 @@ class LSWT extends AudioWorkletProcessor{
   }
   process(inp,outs,pr){
     if(!this._al){this._al=1;this.port.postMessage({alive:1})}
+    this._hb=(this._hb||0)+128;if(this._hb>=sampleRate*.3){this._hb=0;let a=null;for(const v of this.vs)if(v.on&&!v.kill&&!v.rel){(a=a||[]).push(v.id)}if(a)this.port.postMessage({act:a})}
     const out=outs[0],mono=!out[1],total=out[0].length,evs=this.evs;
     if(mono&&!this.tl){this.tl=new Float32Array(128);this.tr=new Float32Array(128)}
     const L=mono?this.tl:out[0],R=mono?this.tr:out[1];
@@ -5347,7 +5348,7 @@ function wtAttach(t){
   const ch=t.ch;if(!ch||!ac||!ac._lswtDone||ch.wtn)return;
   const n=wtMakeNode(ac,{cfg:wtCfg(t),tabs:[wtTabMsg(t,'a'),wtTabMsg(t,'b')]});
   if(!n)return;
-  n.port.onmessage=e=>{const d=e.data;if(!d)return;if(d.alive)n._alive=true;if(d.err){WT_STATUS.err=d.err;console.warn('Wavetable engine error',d.err);if(typeof wtStatusDraw==='function')wtStatusDraw()}};
+  n.port.onmessage=e=>{const d=e.data;if(!d)return;if(d.alive)n._alive=true;if(d.act)wtCheckHeld(n,d.act);if(d.err){WT_STATUS.err=d.err;console.warn('Wavetable engine error',d.err);if(typeof wtStatusDraw==='function')wtStatusDraw()}};
   const rk=wfxBuild(ac,t);n.connect(rk.in);rk.out.connect(ch.vin);ch.wtn=n;
   if(WT_STATUS.mode==='worklet'&&!(typeof OfflineAudioContext!=='undefined'&&ac instanceof OfflineAudioContext)){
     /* a worklet that loaded but never runs (blocked or failed) would stay silent: switch to the compatibility engine */
@@ -5385,15 +5386,25 @@ function wtEvent(n,when,k,id,p,v){
   const tt=(f+.5)/sr,pr=n.parameters;n._n=((n._n||0)%1000000)+1;
   pr.get('evk').setValueAtTime(k,tt);pr.get('evi').setValueAtTime(id,tt);pr.get('evp').setValueAtTime(p,tt);pr.get('evv').setValueAtTime(v,tt);pr.get('evn').setValueAtTime(n._n,tt);
 }
+/* The engine reports the voices it still holds. A held voice that the page has already released (its note-off was lost), or never knew about, is cut. */
+function wtCheckHeld(n,ids){
+  if(!ac||(typeof OfflineAudioContext!=='undefined'&&n.context instanceof OfflineAudioContext))return;const reg=n._ids||(n._ids=new Map()),now=ac.currentTime;
+  ids.forEach(id=>{
+    const e=reg.get(id),cu=n._cut||(n._cut=new Map());
+    if((e===undefined||(e!==Infinity&&now>e+1))&&!(cu.get(id)>now-2)){cu.set(id,now);if(cu.size>200)cu.clear();wtEvent(n,now,1,id,0,0);wtEvent(n,now+.02,2,id,0,0);if(window.dgNote)window.dgNote('engine held a released note, cut it')}
+  });
+  if(reg.size>400)reg.forEach((e,id)=>{if(e!==Infinity&&now>e+12)reg.delete(id)});
+}
 // cuts every wavetable voice and drops the notes that were queued ahead
-function wtPanic(){S.tracks.forEach(t=>{const n=t.ch&&t.ch.wtn;if(n){try{n.port.postMessage({panic:1})}catch(e){}}})}
+function wtPanic(){S.tracks.forEach(t=>{const n=t.ch&&t.ch.wtn;if(n){if(n._ids)n._ids.clear();try{n.port.postMessage({panic:1})}catch(e){}}})}
 function wtVoice(t,p,when,vel){
   const n=t.ch&&t.ch.wtn;if(!n){if(ac&&ac.state!=='closed'&&Date.now()-(wtVoice._w||0)>4000){wtVoice._w=Date.now();toast('Wavetable engine is not ready yet'+(WT_STATUS.why?' ('+WT_STATUS.why+')':''))}return null}
   const id=(++WT_ID)%1000000;
   if(n._bpm!==S.bpm){n._bpm=S.bpm;wtPush(t)}
   wtEvent(n,when,0,id,p,vel/127);
-  const voice={kill(at){wtEvent(n,Math.max(at||0,ac.currentTime),2,id,0,0);voices.delete(voice)},
-    off(time){const tt=Math.max(time||0,when);wtEvent(n,tt,1,id,0,0);setTimeout(()=>voices.delete(voice),Math.max(0,(tt-ac.currentTime)*1000)+8000)}};
+  const reg=n._ids||(n._ids=new Map());reg.set(id,Infinity);
+  const voice={kill(at){reg.delete(id);wtEvent(n,Math.max(at||0,ac.currentTime),2,id,0,0);voices.delete(voice)},
+    off(time){const tt=Math.max(time||0,when);reg.set(id,tt);wtEvent(n,tt,1,id,0,0);setTimeout(()=>voices.delete(voice),Math.max(0,(tt-ac.currentTime)*1000)+8000)}};
   voices.add(voice);return voice;
 }
 
@@ -8425,6 +8436,7 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   function wFor(){const r=$k('oskBody');return Math.max(8,Math.min(22,Math.floor(((r&&r.clientWidth)||800)/46)))}
   function sigNow(){const t=curT(),md=mode();return t?[t.id,md,md==='pads'?padList(t).length:(OSK.octByTrack[t.id]==null?defOct(t):OSK.octByTrack[t.id]),OSK.vel,md==='keys'?wFor():0].join('|'):'x'}
   function build(){
+    releaseAll();
     const root=$k('oskBody');if(!root)return;
     const t=curT();if(!t)return;
     if(OSK.octByTrack[t.id]==null)OSK.octByTrack[t.id]=defOct(t);OSK.oct=OSK.octByTrack[t.id];
@@ -8468,7 +8480,7 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   function keyAt(x,y){const e=document.elementFromPoint(x,y);return e&&e.closest?e.closest('.oskk,.oskpad'):null}
   function press(id,el,ev){
     const n=+el.dataset.n;if(OSK.down.has(id))release(id);
-    OSK.down.set(id,{n,el});el.classList.add('on');
+    OSK.down.set(id,{n,el,pt:ev&&ev.pointerType,t:performance.now()});el.classList.add('on');
     try{liveOn(n,velFrom(ev,el))}catch(e){}
   }
   function release(id){
@@ -8498,6 +8510,14 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
     if(force||!root.firstChild||sigNow()!==OSK.sig)build();
   };
   window.oskReleaseAll=releaseAll;
+  // a key can only be held by a pointer that is really down: anything else is a lost "up" event
+  const act=new Set();
+  document.addEventListener('pointerdown',e=>act.add(e.pointerId),true);
+  ['pointerup','pointercancel'].forEach(k=>document.addEventListener(k,e=>{act.delete(e.pointerId);setTimeout(()=>{if(!act.has(e.pointerId))release(e.pointerId)},30)},true));
+  let tc=0;const lostTouch=()=>[...OSK.down.entries()].forEach(([id,d])=>{if(d.pt==='touch'&&tc===0&&performance.now()-d.t>150)release(id)});
+  ['touchstart','touchmove','touchend','touchcancel'].forEach(k=>document.addEventListener(k,e=>{tc=e.touches.length;if(k==='touchend'||k==='touchcancel')setTimeout(lostTouch,80)},true));
+  setInterval(()=>{lostTouch();OSK.down.forEach((d,id)=>{if(!d.el.isConnected)release(id)})},400);
+  window.addEventListener('blur',releaseAll);
   window.oskHeld=()=>[...OSK.down.values()].map(o=>o.n);
   // hook into the app: tab, pane, layout, and re-render when the selected track changes
   const tab=$k('tabKeys');if(tab)tab.onclick=()=>openBottom('keys');
@@ -8622,6 +8642,7 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
     if(show){draw();timer=setInterval(draw,1000)}
   };
   window.dgReport=report;
+  window.dgNote=k=>{DG.orphans++;ev(k)};
 })();
 
 </script>

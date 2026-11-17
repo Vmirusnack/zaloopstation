@@ -69,6 +69,8 @@ jobs:
           cat > android/app/src/main/java/com/loopstudio/app/MainActivity.java <<'EOF'
           package com.loopstudio.app;
 
+          import android.graphics.Color;
+          import android.graphics.drawable.ColorDrawable;
           import android.os.Bundle;
           import android.view.WindowManager;
           import androidx.core.view.WindowCompat;
@@ -81,6 +83,7 @@ jobs:
             public void onCreate(Bundle savedInstanceState) {
               super.onCreate(savedInstanceState);
               getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#141518")));
               hideBars();
             }
 
