@@ -511,6 +511,23 @@ html.phone body{position:fixed;inset:0}
 .phone #welcome .wf{margin-top:8px}
 .phone .wmr{grid-template-columns:1fr 1fr}
 @media (max-width:560px){.phone #welcome .wg{grid-template-columns:1fr}}
+/* ============ Keys tab (on-screen keyboard and pads) ============ */
+#oskBody{height:100%;display:flex;flex-direction:column;min-height:0;background:var(--field)}
+.oskbar{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);flex:none}
+.oskbar .sp{flex:1}.oskoct{font:12px var(--mono);min-width:76px;text-align:center}.oskname{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:30%}
+.oskarea{flex:1;min-height:0;padding:8px 10px 10px;touch-action:none;-webkit-user-select:none;user-select:none}
+.oskempty{color:var(--dim);text-align:center;padding:30px 16px}
+.oskkeys{position:relative;height:100%;display:flex;--bw:calc(100% / var(--W) * .62)}
+.oskk{touch-action:none}
+.oskk.w{flex:1 1 0;min-width:0;position:relative;background:linear-gradient(#f4f5f8,#d9dce4);border:1px solid #14161b;border-radius:0 0 6px 6px;display:flex;align-items:flex-end;justify-content:center;color:#444;font:10px var(--mono);padding-bottom:6px}
+.oskk.w.on{background:linear-gradient(var(--acc1,#7cb4ff),var(--acc2,#4c9aff));color:#fff}
+.oskk.b{position:absolute;top:0;height:62%;width:var(--bw);z-index:2;background:linear-gradient(#2a2d36,#0b0c10);border:1px solid #000;border-radius:0 0 5px 5px;box-shadow:0 2px 4px rgba(0,0,0,.5)}
+.oskk.b.on{background:linear-gradient(var(--acc2,#4c9aff),var(--acc1,#2d6fd0))}
+.oskpads{display:grid;gap:8px;height:100%;grid-auto-rows:minmax(0,1fr)}
+.oskpad{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:var(--r3,10px);border:1px solid var(--line);background:linear-gradient(var(--btn1),var(--btn2));box-shadow:0 2px 0 rgba(0,0,0,.35);min-width:0;overflow:hidden;touch-action:none}
+.oskpad b{font-size:12px;text-align:center;padding:0 4px}.oskpad small{color:var(--dim);font:10px var(--mono)}
+.oskpad.on{background:linear-gradient(var(--acc1),var(--acc2));color:var(--onaccent);transform:translateY(2px);box-shadow:none}
+.phone .oskbar .mini{height:30px;min-width:38px}
 </style>
 <div id="app">
   <header id="top">
@@ -569,6 +586,7 @@ html.phone body{position:fixed;inset:0}
       <div id="bottom">
         <div class="tabs">
           <button class="tb on" id="tabRoll">Piano Roll</button>
+          <button class="tb" id="tabKeys" title="On-screen keyboard and pads: play the selected track with your fingers or the mouse">Keys</button>
           <button class="tb" id="tabMix">Mixer</button>
           <button class="tb" id="tabSlice">Slicer</button>
           <button class="tb" id="tabSteps" title="Step Editor: a grid for drum patterns and simple melodies">Steps</button>
@@ -587,6 +605,7 @@ html.phone body{position:fixed;inset:0}
           </span>
         </div>
         <div class="pane" id="paneRoll"><div id="rollBody" tabindex="0"><canvas id="rollCv"></canvas></div></div>
+        <div class="pane" id="paneKeys" hidden><div id="oskBody"></div></div>
         <div class="pane" id="paneMix" hidden><div id="mixer"></div></div>
         <div class="pane" id="paneSteps" hidden><div id="stepBody"></div></div>
         <div class="pane" id="paneList" hidden><div id="listBody"></div></div>
@@ -632,6 +651,7 @@ html.phone body{position:fixed;inset:0}
     <tr><td>Two fingers on the tracks</td><td>Pinch to zoom</td></tr>
     <tr><td>Press and hold a region, then drag</td><td>Move it (a quick swipe scrolls the tracks). Double-tap a region to open it in the piano roll</td></tr>
     <tr><td>Press and hold a note</td><td>Delete it</td></tr>
+    <tr><td>Keys tab</td><td>Play the selected track with your fingers (keyboard, or pads for drums and the slicer). Slide between keys; − / + changes the octave. Record with R and Record</td></tr>
     <tr><td>Arrow button on the editor tabs</td><td>Make the editor full height and back</td></tr>
     <tr><td>Start page → Layout</td><td>Auto, Phone (compact) or Desktop</td></tr>
   </table>
@@ -1346,7 +1366,7 @@ function syncVol(t,skip){
 let bottomMode='roll',bottomOpen=true;
 function openBottom(mode){
   if(mode===bottomMode&&bottomOpen&&mode!=='roll-open'){/* keep open */}
-  bottomMode=['mix','slice','steps','list','notes','browse'].includes(mode)?mode:'roll';bottomOpen=true;layoutBottom();
+  bottomMode=['keys','mix','slice','steps','list','notes','browse'].includes(mode)?mode:'roll';bottomOpen=true;layoutBottom();
 }
 function toggleBottom(mode){if(bottomOpen&&bottomMode===mode)bottomOpen=false;else{bottomOpen=true;bottomMode=mode}layoutBottom()}
 function layoutBottom(){
@@ -8317,8 +8337,9 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   window.layoutBottom=function(){
     if(isPh()&&typeof bottomH!=='undefined'){
       if(bottomMode!==lastMode){ // the mixer, slicer and lists need the room: give them the full height, restore the roll size after
-        if(lastMode==='roll')rollH=bottomH;
-        if(bottomMode==='roll'){if(rollH)bottomH=rollH}else if(lastMode==='roll')bottomH=botMax();
+        const small=m=>m==='roll'||m==='keys';
+        if(small(lastMode)&&!small(bottomMode)){rollH=bottomH;bottomH=botMax()}
+        else if(!small(lastMode)&&small(bottomMode)){if(rollH)bottomH=rollH}
         lastMode=bottomMode}
       bottomH=Math.min(bottomH,botMax())}
     lb.apply(this,arguments);syncButtons();
@@ -8361,6 +8382,126 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   window.addEventListener('orientationchange',()=>setTimeout(()=>window.dispatchEvent(new Event('resize')),250));
   window.phoneApply=apply;
   apply(true);
+})();
+
+</script>
+<script>
+/* ============ On-screen keyboard and pads (Keys tab) ============
+   Plays the selected track through liveOn / liveOff, the same path as a MIDI keyboard, so recording works the same way. */
+(function(){
+  const $k=id=>document.getElementById(id);
+  const OSK={oct:null,octByTrack:{},vel:'fixed',down:new Map(),w:0,sig:''};
+  const isBlack=n=>[1,3,6,8,10].includes(n%12);
+  const defOct=t=>t&&t.type==='bass'?1:(t&&t.type==='sfx'?2:3);
+  const curT=()=>selTrackObj();
+  const baseNote=()=>12*(OSK.oct+2);                       // C3 = 60
+  function mode(){
+    const t=curT();if(!t)return 'none';
+    if(t.type==='audio')return 'none';
+    if(t.type==='drums')return 'pads';
+    if(t.type==='slicer')return (t.smp&&t.smp.mode==='chromatic')?'keys':'pads';
+    return 'keys';
+  }
+  function padList(t){
+    if(t.type==='drums')return Object.keys(DRUMS).map(Number).map(p=>({p,name:DRUMS[p]}));
+    const m=t.smp,n=m&&m.marks?Math.min(m.marks.length,MAX_SLICES):0;const a=[];
+    for(let i=0;i<n;i++)a.push({p:SLICE_BASE+i,name:'Slice '+(i+1)});return a;
+  }
+  function velFrom(ev,el){
+    if(OSK.vel==='fixed')return 100;
+    const r=el.getBoundingClientRect(),f=Math.min(1,Math.max(0,(ev.clientY-r.top)/Math.max(1,r.height)));
+    return Math.round(40+f*87);
+  }
+  function wFor(){const r=$k('oskBody');return Math.max(8,Math.min(22,Math.floor(((r&&r.clientWidth)||800)/46)))}
+  function sigNow(){const t=curT(),md=mode();return t?[t.id,md,md==='pads'?padList(t).length:(OSK.octByTrack[t.id]==null?defOct(t):OSK.octByTrack[t.id]),OSK.vel,md==='keys'?wFor():0].join('|'):'x'}
+  function build(){
+    const root=$k('oskBody');if(!root)return;
+    const t=curT();if(!t)return;
+    if(OSK.octByTrack[t.id]==null)OSK.octByTrack[t.id]=defOct(t);OSK.oct=OSK.octByTrack[t.id];
+    const md=mode();
+    const bar=`<div class="oskbar">
+      <button class="mini" id="oskDn" title="Octave down"${md!=='keys'?' style="visibility:hidden"':''}>−</button>
+      <span class="oskoct" id="oskOct">${md==='keys'?'C'+OSK.oct+' – C'+(OSK.oct+2):(md==='pads'?'Pads':'')}</span>
+      <button class="mini" id="oskUp" title="Octave up"${md!=='keys'?' style="visibility:hidden"':''}>+</button>
+      <span class="sp"></span>
+      <button class="mini" id="oskVel" title="Fixed velocity or velocity from where you touch the key (lower = louder)">Velocity: ${OSK.vel==='fixed'?'fixed':'touch'}</button>
+      <span class="oskname">${esc(t.name)}</span>
+    </div>`;
+    let body='';
+    if(md==='none')body='<div class="oskempty">Select a software instrument track to play it here.</div>';
+    else if(md==='pads'){
+      const pl=padList(t);
+      if(!pl.length)body='<div class="oskempty">Load a sample into the slicer and set slice marks to get pads.</div>';
+      else{const cols=pl.length<=12?6:(pl.length<=24?8:12);
+        body='<div class="oskpads" style="grid-template-columns:repeat('+cols+',minmax(0,1fr))">'+pl.map(x=>'<div class="oskpad" data-n="'+x.p+'"><b>'+esc(x.name)+'</b><small>'+noteName(x.p)+'</small></div>').join('')+'</div>'}
+    }else{
+      const W=wFor();OSK.w=W;
+      const b0=baseNote();let whites='',blacks='';
+      let n=b0,i=0;
+      while(i<W){
+        while(isBlack(n))n++;
+        whites+='<div class="oskk w'+(n%12===0?' c':'')+'" data-n="'+n+'"><span>'+(n%12===0?noteName(n):'')+'</span></div>';
+        // black key sits to the right of this white key when the next semitone is black
+        if(i<W-1&&isBlack(n+1))blacks+='<div class="oskk b" data-n="'+(n+1)+'" style="left:calc('+((i+1)/W*100)+'% - var(--bw)/2)"></div>';
+        n++;i++;
+      }
+      body='<div class="oskkeys" style="--W:'+W+'">'+whites+blacks+'</div>';
+    }
+    root.innerHTML=bar+'<div class="oskarea" id="oskArea">'+body+'</div>';
+    $k('oskDn').onclick=()=>shift(-1);$k('oskUp').onclick=()=>shift(1);
+    $k('oskVel').onclick=()=>{OSK.vel=OSK.vel==='fixed'?'touch':'fixed';build()};
+    const area=$k('oskArea');
+    if(md!=='none')wire(area);
+    OSK.sig=sigNow();
+  }
+  function shift(d){const t=curT();if(!t)return;releaseAll();OSK.octByTrack[t.id]=Math.max(0,Math.min(6,(OSK.octByTrack[t.id]??3)+d));build()}
+  function keyAt(x,y){const e=document.elementFromPoint(x,y);return e&&e.closest?e.closest('.oskk,.oskpad'):null}
+  function press(id,el,ev){
+    const n=+el.dataset.n;if(OSK.down.has(id))release(id);
+    OSK.down.set(id,{n,el});el.classList.add('on');
+    try{liveOn(n,velFrom(ev,el))}catch(e){}
+  }
+  function release(id){
+    const d=OSK.down.get(id);if(!d)return;OSK.down.delete(id);d.el.classList.remove('on');
+    let still=false;OSK.down.forEach(o=>{if(o.n===d.n)still=true});
+    if(!still)try{liveOff(d.n)}catch(e){}
+  }
+  function releaseAll(){[...OSK.down.keys()].forEach(release)}
+  function wire(area){
+    area.addEventListener('pointerdown',e=>{
+      const el=e.target.closest('.oskk,.oskpad');if(!el)return;e.preventDefault();
+      try{area.setPointerCapture(e.pointerId)}catch(x){}
+      try{initAudio()}catch(x){}
+      press(e.pointerId,el,e);
+    });
+    area.addEventListener('pointermove',e=>{
+      const d=OSK.down.get(e.pointerId);if(!d)return;
+      const el=keyAt(e.clientX,e.clientY);if(el&&el!==d.el&&area.contains(el)){e.preventDefault();release(e.pointerId);press(e.pointerId,el,e)}
+    });
+    const up=e=>{release(e.pointerId);try{if(typeof ac!=='undefined'&&ac&&ac.state==='suspended')ac.resume()}catch(x){}};
+    area.addEventListener('pointerup',up);area.addEventListener('pointercancel',up);area.addEventListener('lostpointercapture',up);
+    area.addEventListener('contextmenu',e=>e.preventDefault());
+  }
+  window.renderKeys=function(force){
+    if(!bottomOpen||bottomMode!=='keys')return;
+    const root=$k('oskBody');if(!root)return;
+    if(force||!root.firstChild||sigNow()!==OSK.sig)build();
+  };
+  window.oskReleaseAll=releaseAll;
+  // hook into the app: tab, pane, layout, and re-render when the selected track changes
+  const tab=$k('tabKeys');if(tab)tab.onclick=()=>openBottom('keys');
+  const lb=window.layoutBottom;
+  window.layoutBottom=function(){
+    lb.apply(this,arguments);
+    const pk=$k('paneKeys');if(pk)pk.hidden=bottomMode!=='keys';
+    const tk=$k('tabKeys');if(tk)tk.classList.toggle('on',bottomMode==='keys'&&bottomOpen);
+    if(bottomOpen&&bottomMode==='keys')requestAnimationFrame(()=>window.renderKeys(false));else releaseAll();
+  };
+  const rr=window.renderInspector;
+  if(typeof rr==='function')window.renderInspector=function(){const r=rr.apply(this,arguments);if(bottomOpen&&bottomMode==='keys')window.renderKeys(false);return r};
+  window.addEventListener('resize',()=>{if(bottomOpen&&bottomMode==='keys')setTimeout(()=>window.renderKeys(false),150)});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseAll()});
+  layoutBottom();
 })();
 
 </script>
