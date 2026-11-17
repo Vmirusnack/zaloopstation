@@ -536,6 +536,12 @@ html.phone body{position:fixed;inset:0}
 #dgwin .btnrow{display:flex;gap:6px;margin-top:12px}
 .phone #dgwin{top:4px;max-height:calc(100vh - 8px)}
 .phone .dgr{grid-template-columns:120px minmax(0,1fr)}
+/* ============ Takes ============ */
+.region.stk .rh{height:13px;line-height:13px;font-size:9px;padding:0 4px}
+.tkrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px;align-items:center;margin:4px 0;padding:2px 4px;border-radius:var(--r2);border:1px solid transparent}
+.tkrow.sel{background:var(--sel);border-color:var(--edge)}
+.tkrow .tkn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.tkrow .mini.on{background:#2f9e5a;color:#fff;border-color:#1c6b39}
 </style>
 <div id="app">
   <header id="top">
@@ -544,7 +550,7 @@ html.phone body{position:fixed;inset:0}
       <button class="tb on" id="bInsp" title="Inspector (I)">Inspector</button>
       <button class="tb on" id="bRollBtn" title="Piano Roll (P)">Piano Roll</button>
       <button class="tb" id="bMixBtn" title="Mixer (X)">Mixer</button>
-      <button class="tb" id="bAuto" title="Automation view (A): draw volume, pan and Key Harmonizer curves over the tracks">Auto</button><select class="sb" id="autoParam" style="width:128px" hidden aria-label="Automation parameter"><option value="vol">Volume</option><option value="pan">Pan</option><optgroup label="Key Harmonizer"><option value="fx.keyharm.key">KeyHarm · Key</option><option value="fx.keyharm.scale">KeyHarm · Scale</option><option value="fx.keyharm.snap">KeyHarm · Snap</option><option value="fx.keyharm.cut">KeyHarm · Low cut</option><option value="fx.keyharm.mix">KeyHarm · Mix</option><option value="fx.keyharm.out">KeyHarm · Output</option></optgroup></select>
+      <button class="tb" id="bAuto" title="Automation view (A): draw volume, pan, OTT, Autotune and Key Harmonizer curves over the tracks">Auto</button><select class="sb" id="autoParam" style="width:128px" hidden aria-label="Automation parameter"><option value="vol">Volume</option><option value="pan">Pan</option><optgroup label="OTT"><option value="fx.ott.depth">OTT · Depth</option><option value="fx.ott.time">OTT · Time</option><option value="fx.ott.up">OTT · Upward</option><option value="fx.ott.down">OTT · Downward</option><option value="fx.ott.low">OTT · Low gain</option><option value="fx.ott.mid">OTT · Mid gain</option><option value="fx.ott.high">OTT · High gain</option><option value="fx.ott.inG">OTT · Input</option><option value="fx.ott.outG">OTT · Output</option><option value="fx.ott.mix">OTT · Mix</option></optgroup><optgroup label="Autotune"><option value="fx.tune.speed">Autotune · Retune speed</option><option value="fx.tune.amount">Autotune · Amount</option><option value="fx.tune.flex">Autotune · Flex</option><option value="fx.tune.ref">Autotune · Tuning</option><option value="fx.tune.mix">Autotune · Mix</option></optgroup><optgroup label="Key Harmonizer"><option value="fx.keyharm.key">KeyHarm · Key</option><option value="fx.keyharm.scale">KeyHarm · Scale</option><option value="fx.keyharm.snap">KeyHarm · Snap</option><option value="fx.keyharm.cut">KeyHarm · Low cut</option><option value="fx.keyharm.mix">KeyHarm · Mix</option><option value="fx.keyharm.out">KeyHarm · Output</option></optgroup></select>
     </div>
     <div class="grow"></div>
     <div class="grp" id="transport">
@@ -771,6 +777,9 @@ html.phone body{position:fixed;inset:0}
     <tr><td>My synth presets</td><td>In the Wavetable Synth the Save ▾ button stores the current sound as your own preset (shown under “My presets”), overwrites, renames or deletes it, and exports or imports all presets as a .json file. They live in this browser; export them to keep a backup or move them to another computer. Acid Synth tracks have the same under My presets ▾.</td></tr>
     <tr><td>Level meters</td><td>Stereo meters with peak hold, a peak number and a clip lamp on every mixer strip, the buses and the master, plus a wide one in the toolbar. Click a meter to reset its peak and clip, right-click to cycle the style. Styles: Tri-colour LED, Classic LED, LCD blue, LCD amber dots and Boombox 90s (the list next to Single in the mixer).</td></tr>
     <tr><td>Key Harmonizer</td><td>An insert effect for any track (synth, sample, loop), a bus or the master. It moves the partials of the sound onto the notes of the chosen Key and Scale, so a bright lead or a sampled loop stays rich but fits the key. Snap sets how strongly, Low cut leaves the bass and kick untouched, Mix blends with the original. The display shows the sound with the notes of the scale marked (the root in gold). Fast mode adds about 21 ms of delay and High about 43 ms; the other tracks are delayed to match, so everything stays in time (exports are shifted back). It works best on melodic parts; on a whole mix it can raise peaks. <b>Automation:</b> Key, Scale, Snap, Low cut, Mix and Output can be automated on a track (first Key Harmonizer insert). Press A for the automation view, choose “Key Harmonizer · …” in the list next to Auto, and click the lane to add points; Key and Scale step from point to point. Or set the track to Touch / Latch / Write and turn the knobs while the song plays. The knobs follow the curve.</td></tr>
+    <tr><td>Count-in</td><td>Inspector ▸ Count-in (Off, 1 bar, 2 bars). When Record is on and you press Play, the metronome counts the bars first, then the recording and the song start together</td></tr>
+    <tr><td>Takes</td><td>Record with the loop on and every pass becomes its own take, stacked in the lane. The last take plays; select any take and use Takes here in the Inspector to play only that one or to mute it. Split takes with the scissors to build a comp from the best phrases</td></tr>
+    <tr><td>Automate OTT and Autotune</td><td>Auto button ▸ choose an OTT or Autotune parameter, draw the curve, or set the track to Touch / Latch / Write and move the slider while playing. Works in the bounce too</td></tr>
     <tr><td>Sound health</td><td>Appearance ▸ Sound and performance ▸ Sound health… counts dropouts, page freezes and stuck notes and gives a report you can copy. A note that is held for more than 25 seconds with no key down is released automatically; there is also a limit on how many voices sound at once</td></tr>
     <tr><td>Hanging notes and crackle</td><td>Esc releases every note you are holding. Press Stop again while stopped to cut everything that still sounds (“panic”). Notes from the computer keyboard also work with a Ukrainian or Russian layout. If the sound crackles, open Appearance ▸ Sound and performance and set Audio buffer to Safe (reload the page after), and turn on Light visuals. The app warns you when it notices the sound breaking up.</td></tr>
     <tr><td>Rainbow sounds</td><td>Wavetable Synth presets “Rainbow lead (glide)”, “Rainbow dive” and “Rainbow rise”: a fast pitch envelope on a thick saw stack makes the harmonics fan out (dive falls, rise climbs, the lead slides between overlapping notes). Put a Key Harmonizer after them to tune the sweep into the key. The “Rainbow Drop” template shows it all at 200 BPM.</td></tr>
@@ -1028,7 +1037,7 @@ function panic(quiet){
 function liveOn(p,vel){
   const t=S.tracks.find(x=>x.id===S.selTrack);if(!t||live[p])return;initAudio();buildChain(t);applyMix();
   live[p]=startVoice(t,p,ac.currentTime+.005,vel||100);
-  if(S.rec&&S.playing)recOn[p]={beat:curBeat(),track:t,vel:vel||100};
+  if(S.rec&&S.playing&&!(window.CIS&&CIS.end&&ac.currentTime<CIS.end))recOn[p]={beat:curBeat(),track:t,vel:vel||100};
   flashKey(p,true);
 }
 function liveOff(p){
@@ -1863,8 +1872,10 @@ function fxParamsBody(t,fx){
       }else{
         row.innerHTML=`<label>${d.label}</label><input type="range" min="0" max="1000" step="1" value="${Math.round(fxPos(d,v)*1000)}"><span>${fxFmt(d,v)}</span>`;
         const sl=row.querySelector('input'),sp=row.querySelector('span');
+        const am=AUTO_FXP[fx.type]&&AUTO_FXP[fx.type].params.includes(d.k)&&(t.fx||[]).find(f=>f.type===fx.type)===fx,ak='fx.'+fx.type+'.'+d.k;
+        if(am){let ui=KH_UI.get(fx.id);if(!ui){ui={};KH_UI.set(fx.id,ui)}ui[d.k]=x=>{sl.value=Math.round(x*1000);sp.textContent=fxFmt(d,fxVal(d,x))};sl.addEventListener('change',()=>autoRelease(t,ak))}
         sl.addEventListener('pointerdown',pushUndo);
-        sl.oninput=()=>{const nv=fxVal(d,sl.value/1000);fx.p[d.k]=nv;sp.textContent=fxFmt(d,nv);fxUpdate(t,fx);changed()};
+        sl.oninput=()=>{const nv=fxVal(d,sl.value/1000);fx.p[d.k]=nv;sp.textContent=fxFmt(d,nv);if(am)autoTouch(t,ak,sl.value/1000);fxUpdate(t,fx);changed()};
         sl.ondblclick=()=>{fx.p[d.k]=d.def;sl.value=Math.round(fxPos(d,d.def)*1000);sp.textContent=fxFmt(d,d.def);fxUpdate(t,fx);changed()};
       }
       body.appendChild(row);
@@ -3536,7 +3547,7 @@ function pushUndoFrom(prev){const cur=S.masterFx;S.masterFx=prev;pushUndo();S.ma
 const AUTO_MODES=['off','read','touch','latch','write'];
 /* Plug-in parameters are automated under keys like 'fx.keyharm.snap' (the first insert of that type on the track).
    Their points are stored normalized 0..1 (like a knob); stepped parameters (Key, Scale) hold their value until the next point. */
-const AUTO_FXP={keyharm:{label:'Key Harmonizer',params:['key','scale','snap','cut','mix','out']}};
+const AUTO_FXP={keyharm:{label:'Key Harmonizer',params:['key','scale','snap','cut','mix','out']},ott:{label:'OTT',params:['depth','time','up','down','low','mid','high','inG','outG','mix']},tune:{label:'Autotune',params:['speed','amount','flex','ref','mix']}};
 const autoIsFx=k=>typeof k==='string'&&k.startsWith('fx.');
 function autoFxOf(t,k){
   const m=/^fx\.(\w+)\.(\w+)$/.exec(k);if(!m||!AUTO_FXP[m[1]]||!FX_DEFS[m[1]])return null;
@@ -6904,6 +6915,7 @@ function pdcShift(buf,sec){
 function ottEngine(AudioWorkletProcessor,registerProcessor,sampleRate){
   const TH=[[-18,-36],[-20,-38],[-24,-42]],TF=[1.6,1,.6];
   class LSOTT extends AudioWorkletProcessor{
+    static get parameterDescriptors(){return [['depth',.7],['time',.5],['up',1],['down',1],['low',0],['mid',0],['high',0],['inG',0],['outG',0],['mix',1]].map(a=>({name:a[0],defaultValue:a[1],automationRate:'k-rate'}))}
     constructor(o){
       super();this.P=(o.processorOptions||{}).p||{};
       this.cs=[new Float64Array(8),new Float64Array(8)];   // per channel: 2 crossovers x 2 biquads x 2 states
@@ -6921,10 +6933,11 @@ function ottEngine(AudioWorkletProcessor,registerProcessor,sampleRate){
       let y=c.lb0*x+s[o];s[o]=c.lb1*x-c.a1*y+s[o+1];s[o+1]=c.lb2*x-c.a2*y;
       const y2=c.lb0*y+s[o+2];s[o+2]=c.lb1*y-c.a1*y2+s[o+3];s[o+3]=c.lb2*y-c.a2*y2;return y2;
     }
-    process(inp,outs){
+    process(inp,outs,pr){
       const out=outs[0],inn=inp[0];if(!out||!out[0])return true;
       const n=out[0].length,P=this.P,sr=sampleRate;
       if(!inn||!inn.length||!inn[0]){for(const ch of out)ch.fill(0);return true}
+      if(pr&&pr.depth){P.depth=pr.depth[0];P.time=pr.time[0];P.up=pr.up[0];P.down=pr.down[0];P.low=Math.pow(10,pr.low[0]/20);P.mid=Math.pow(10,pr.mid[0]/20);P.high=Math.pow(10,pr.high[0]/20);P.inG=Math.pow(10,pr.inG[0]/20);P.outG=Math.pow(10,pr.outG[0]/20);P.mix=pr.mix[0]}
       const nc=Math.min(out.length,2),L=inn[0],R=inn[1]||inn[0];
       const depth=P.depth,upA=depth*P.up,dnA=depth*P.down,sD=dnA*.85,sU=upA*.8,maxUp=upA*24;
       const ta=.0005+P.time*.03,tr=.03+P.time*.4,ca=[],cr=[];
@@ -6986,10 +6999,19 @@ function ottCfg(p,val){
   const v=k=>val(p,k),db=k=>Math.pow(10,v(k)/20);
   return {depth:v('depth'),time:v('time'),up:v('up'),down:v('down'),low:db('low'),mid:db('mid'),high:db('high'),inG:db('inG'),outG:db('outG'),mix:v('mix')};
 }
+/* automatable plug-in values travel as AudioParams in the knob's own units (dB, ms, cents, 0..1); a value that a curve is driving right now is left alone */
+function apBind(o,n,keys,type,offline,ctx,val){
+  o.ap={};o.t=null;keys.forEach(k=>o.ap[k]=n.parameters.get(k));
+  o.live=k=>{const t=o.t,a='fx.'+type+'.'+k;return !!(t&&S.playing&&t.autoMode!=='off'&&autoPts(t,a).length&&!(t._wr&&t._wr[a]))};
+  o.setAp=p=>keys.forEach(k=>{if(o.live(k))return;const ap=n.parameters.get(k);try{if(!offline)ap.cancelScheduledValues(ctx.currentTime);ap.value=val(p,k)}catch(e){}});
+}
+const OTT_AP=['depth','time','up','down','low','mid','high','inG','outG','mix'],TUNE_AP=['speed','amount','flex','ref','mix'];
+const apInit=(keys,p,val)=>{const r={};keys.forEach(k=>r[k]=val(p,k));return r};
 function makeOtt(ctx,offline,fxp,set,val){
   if(ctx._lso){
-    const n=new AudioWorkletNode(ctx,'ls-ott',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',processorOptions:{p:ottCfg(fxp,val)}});
-    const o={in:n,out:n,worklet:true,stat:null,update(p){n.port.postMessage({p:ottCfg(p,val)})},dispose(){try{n.disconnect()}catch(e){}}};
+    const n=new AudioWorkletNode(ctx,'ls-ott',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',parameterData:apInit(OTT_AP,fxp,val),processorOptions:{p:ottCfg(fxp,val)}});
+    const o={in:n,out:n,worklet:true,stat:null,update(p){n.port.postMessage({p:ottCfg(p,val)});o.setAp(p)},dispose(){try{n.disconnect()}catch(e){}}};
+    apBind(o,n,OTT_AP,'ott',offline,ctx,val);
     if(!offline)n.port.onmessage=e=>{const d=e.data;if(d&&d.g)o.stat={g:d.g,lv:d.lv,t:performance.now()}};
     return o;
   }
@@ -7166,6 +7188,7 @@ function bindAudInput(t){
 function tuneEngine(AudioWorkletProcessor,registerProcessor,sampleRate){
   const DEC=2,W=640,TAUMAX=320,HOP=512,DL=16384,MASK=2047;
   class LSTUNE extends AudioWorkletProcessor{
+    static get parameterDescriptors(){return [['speed',60],['amount',1],['flex',8],['ref',0],['mix',1]].map(a=>({name:a[0],defaultValue:a[1],automationRate:'k-rate'}))}
     constructor(o){
       super();this.P=(o.processorOptions||{}).p||{mask:[1,1,1,1,1,1,1,1,1,1,1,1]};
       this.dl=[new Float32Array(DL),new Float32Array(DL)];this.w=0;this.dbuf=new Float32Array(2048);this.dw=0;this.dacc=0;this.dn=0;
@@ -7187,9 +7210,10 @@ function tuneEngine(AudioWorkletProcessor,registerProcessor,sampleRate){
       const a=d[best-1],b=d[best],c=d[best+1],den=a-2*b+c;let tp=best;if(den>1e-9)tp=best+.5*(a-c)/den;
       return srd/tp;
     }
-    process(inp,outs){
+    process(inp,outs,pr){
       const out=outs[0],inn=inp[0];if(!out||!out[0])return true;
       const n=out[0].length,P=this.P,sr=sampleRate,mask=P.mask;
+      if(pr&&pr.speed){P.speed=pr.speed[0];P.amount=pr.amount[0];P.flex=pr.flex[0];P.ref=pr.ref[0];P.mix=pr.mix[0]}
       if(!inn||!inn.length||!inn[0]){for(const ch of out)ch.fill(0);return true}
       const nc=Math.min(2,out.length),x0=inn[0],x1=inn[1]||inn[0],dl=this.dl;
       const aSm=P.speed>.5?1-Math.exp(-1/(P.speed*.001*sr)):1-Math.exp(-1/(.003*sr)),mix=P.mix,ref=Math.pow(2,P.ref/1200);
@@ -7267,8 +7291,9 @@ function tuneCfg(p,val){
 }
 function makeTune(ctx,offline,fxp,set,val){
   if(ctx._lst){
-    const n=new AudioWorkletNode(ctx,'ls-tune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',processorOptions:{p:tuneCfg(fxp,val)}});
-    const o={in:n,out:n,worklet:true,stat:null,update(p){n.port.postMessage({p:tuneCfg(p,val)})},dispose(){try{n.disconnect()}catch(e){}}};
+    const n=new AudioWorkletNode(ctx,'ls-tune',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',parameterData:apInit(TUNE_AP,fxp,val),processorOptions:{p:tuneCfg(fxp,val)}});
+    const o={in:n,out:n,worklet:true,stat:null,update(p){n.port.postMessage({p:tuneCfg(p,val)});o.setAp(p)},dispose(){try{n.disconnect()}catch(e){}}};
+    apBind(o,n,TUNE_AP,'tune',offline,ctx,val);
     if(!offline)n.port.onmessage=e=>{const d=e.data;if(d&&d.f!==undefined)o.stat={f:d.f,n:d.n,s:d.s,m:d.m,t:performance.now()}};
     return o;
   }
@@ -8643,6 +8668,146 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   };
   window.dgReport=report;
   window.dgNote=k=>{DG.orphans++;ev(k)};
+})();
+
+</script>
+<script>
+/* ============ Recording helpers: count-in, loop-recording takes, take picker ============ */
+(function(){
+  const CI={bars:0};
+  try{CI.bars=Math.max(0,Math.min(2,+(JSON.parse(localStorage.getItem('loopstudio.countin')||'{}').bars)||0))}catch(e){}
+  const saveCI=()=>{try{localStorage.setItem('loopstudio.countin',JSON.stringify({bars:CI.bars}))}catch(e){}};
+  const realNow=()=>{const d=Object.getOwnPropertyDescriptor(BaseAudioContext.prototype,'currentTime');return d.get.call(ac)};
+  const CIS=window.CIS={end:0,start:0};
+  const counting=()=>!!(CIS.end&&ac&&realNow()<CIS.end-.005);
+
+  // 1. count-in: the transport starts in the future and the metronome counts the bars before it
+  const op=window.play;
+  window.play=function(){
+    if(!(S.rec&&!S.playing&&CI.bars>0))return op.apply(this,arguments);
+    initAudio();
+    const spb=60/S.bpm,n=CI.bars*4,d=n*spb,real=realNow(),start=S.pos;
+    CIS.start=start;CIS.end=real+.05+d;
+    for(let i=0;i<n;i++)click(real+.05+i*spb,i%4===0);
+    const desc=Object.getOwnPropertyDescriptor(BaseAudioContext.prototype,'currentTime');
+    try{Object.defineProperty(ac,'currentTime',{configurable:true,get(){return desc.get.call(ac)+d}});op.apply(this,arguments)}
+    finally{try{delete ac.currentTime}catch(e){}}
+    clearTimeout(CI.t);CI.t=setTimeout(()=>{if(S.playing&&typeof audRecSync==='function')audRecSync()},d*1000+80);
+    try{toast('Count-in: '+CI.bars+(CI.bars>1?' bars':' bar'))}catch(e){}
+  };
+  const opa=window.pause;
+  window.pause=function(){
+    const was=counting();opa.apply(this,arguments);
+    if(was)S.pos=CIS.start;CIS.end=0;clearTimeout(CI.t);
+  };
+  const osync=window.audRecSync;
+  window.audRecSync=function(){
+    if(counting()&&S.playing&&S.rec&&!AREC.active)return;   // wait: recording begins with the first bar
+    return osync.apply(this,arguments);
+  };
+
+  // 2. recording while the loop is on: every pass becomes its own take
+  const ot=window.tick;
+  window.tick=function(){
+    const a=segs.length?lastSeg().ctx:0,r=ot.apply(this,arguments);
+    if(AREC.active&&segs.length){const l=lastSeg();if(l.ctx!==a&&l.beat===S.cycleStart)(AREC.passes||(AREC.passes=[])).push({ctx:l.ctx,start:S.cycleStart,end:S.cycleEnd})}
+    return r;
+  };
+  const oStart=window.audRecStart;
+  window.audRecStart=function(){AREC.passes=[];return oStart.apply(this,arguments)};
+  const oFin=window.audRecFinish;
+  let GID=0;
+  window.audRecFinish=function(t){
+    const passes=AREC.passes||[];AREC.passes=[];
+    if(!passes.length||!AREC.n||AREC.startBeat===null||!t||AREC.t0===null)return oFin.apply(this,arguments);
+    const sr=ac.sampleRate,n=AREC.n,all=new Float32Array(n);let p=0;for(const c of AREC.chunks){all.set(c,p);p+=c.length}
+    const t0=AREC.t0,sb=AREC.startBeat,spb=60/S.bpm,lat=audLatency();AREC.chunks=[];AREC.n=0;
+    const bounds=[];let cur={sBeat:sb,t:t0};
+    passes.forEach(q=>{bounds.push({s:cur.sBeat,e:q.end,a:cur.t,b:q.ctx});cur={sBeat:q.start,t:q.ctx}});
+    const endT=t0+n/sr-lat;bounds.push({s:cur.sBeat,e:cur.sBeat+Math.max(0,endT-cur.t)/spb,a:cur.t,b:endT});
+    pushUndo();
+    const gid=++GID+Date.now(),made=[],base=t.regions.filter(r=>r.clip).length;
+    bounds.forEach(b=>{
+      const i0=Math.max(0,Math.round((b.a-t0+lat)*sr)),i1=Math.min(n,Math.round((b.b-t0+lat)*sr));
+      if(i1-i0<sr*.15||b.e-b.s<.25)return;
+      const buf=ac.createBuffer(1,i1-i0,sr);buf.getChannelData(0).set(all.subarray(i0,i1));
+      const w=encodeWav(buf,0,true),id=uid++,nm='Take '+(base+made.length+1);
+      AUD[id]=mkClip(buf,w.data,nm+'.wav');idbPut('aud'+id,w.data);
+      const r=newRegion(b.s,Math.max(.25,Math.ceil((b.e-b.s)*4-1e-6)/4),nm);r.clip=id;r.clipName=nm+'.wav';r.off=0;r.gain=0;r.take=gid;t.regions.push(r);made.push(r);
+    });
+    if(!made.length){S.selTrack=t.id;renderAll();return}
+    // the newest take plays; earlier ones stay on the track, muted, and can be picked in the Inspector
+    t.regions.forEach(r=>{if(r.take&&made.every(m=>m!==r)&&made.some(m=>overlap(r,m)))r.mute=true});
+    made.forEach((r,i)=>r.mute=i<made.length-1);
+    const last=made[made.length-1];S.selTrack=t.id;S.selBus=null;S.selRegion=last.id;renderAll();selectRegion(last);changed();
+    toast(made.length+' takes recorded. The last one plays. Select a take and use “Takes here” in the Inspector to pick another');
+  };
+  // an ordinary take: mute earlier takes it covers
+  const oFin2=window.audRecFinish;
+  window.audRecFinish=function(t){
+    const before=new Set(t?t.regions.map(r=>r.id):[]);
+    const r=oFin2.apply(this,arguments);
+    if(t){const fresh=t.regions.filter(x=>x.clip&&!before.has(x.id)&&!x.take);
+      if(fresh.length===1){const nr=fresh[0];nr.take=++GID+Date.now();
+        let n=0;t.regions.forEach(x=>{if(x!==nr&&x.take&&!x.mute&&overlap(x,nr)){x.mute=true;n++}});
+        if(n){renderLanes();changed();toast('Take recorded. The earlier take is kept, muted. Pick between takes in the Inspector (Takes here)')}}}
+    return r;
+  };
+  const overlap=(a,b)=>a.start<b.start+b.len-1e-6&&b.start<a.start+a.len-1e-6;
+
+  // 3. regions that overlap on an audio track are stacked so every take is visible
+  const reF=window.regionEl;
+  window.regionEl=function(t,r){
+    const d=reF.apply(this,arguments);
+    if(!r.clip)return d;
+    const cl=t.regions.filter(x=>x.clip).sort((a,b)=>a.start-b.start||a.id-b.id),rows=[],RW=new Map();
+    cl.forEach(x=>{let k=0;while(rows[k]!==undefined&&rows[k]>x.start+1e-6)k++;rows[k]=x.start+x.len;RW.set(x,k)});
+    // the stack height follows the cluster of regions that overlap this one
+    const grp=cl.filter(x=>overlapChain(cl,r,x));const nr=Math.max(...grp.map(x=>RW.get(x)))+1;
+    if(nr>1){
+      const h=(LH-6)/nr,row=RW.get(r);d.classList.add('stk');
+      d.style.top=(3+row*h)+'px';d.style.bottom='auto';d.style.height=(h-1)+'px';
+      const cv=d.querySelector('canvas');if(cv){cv.style.top='13px';cv.style.height=Math.max(0,h-14)+'px'}
+    }
+    return d;
+  };
+  function overlapChain(cl,a,x){ // x belongs to the same cluster of overlapping regions as a
+    const seen=new Set([a]),q=[a];
+    while(q.length){const c=q.pop();cl.forEach(y=>{if(!seen.has(y)&&overlap(c,y)){seen.add(y);q.push(y)}})}
+    return seen.has(x);
+  }
+
+  // 4. Inspector: count-in setting and the take picker
+  const ri=window.renderInspector;
+  window.renderInspector=function(){
+    const r=ri.apply(this,arguments);
+    try{vocalInspector()}catch(e){console.warn(e)}
+    return r;
+  };
+  function vocalInspector(){
+    const box=document.getElementById('insp');if(!box)return;
+    const am=box.querySelector('#iAm');
+    if(am&&!box.querySelector('#iCi')){
+      const row=am.closest('.row'),n=document.createElement('div');n.className='row';
+      n.innerHTML='<label title="Bars of metronome before recording starts">Count-in</label><select class="sb" id="iCi"><option value="0">Off</option><option value="1">1 bar</option><option value="2">2 bars</option></select>';
+      row.after(n);const sel=n.querySelector('select');sel.value=String(CI.bars);sel.onchange=()=>{CI.bars=+sel.value;saveCI()};
+    }
+    const reg=findRegion(S.selRegion),t=S.tracks.find(x=>x.id===S.selTrack);
+    box.querySelectorAll('#iTakes').forEach(e=>e.remove());
+    if(!reg||!reg.clip||!t)return;
+    const grp=t.regions.filter(x=>x.clip&&overlap(x,reg)).sort((a,b)=>a.id-b.id);
+    if(grp.length<2)return;
+    const d=document.createElement('div');d.id='iTakes';
+    d.innerHTML='<h4>Takes here</h4>'+grp.map(x=>`<div class="tkrow${x.id===reg.id?' sel':''}" data-id="${x.id}"><span class="tkn" title="Select this take">${esc(x.name)}</span><button class="mini tkonly" title="Play only this take where it overlaps the others">Only</button><button class="mini tkm${x.mute?'':' on'}" title="${x.mute?'Muted. Click to play it':'Playing. Click to mute it'}">${x.mute?'Muted':'On'}</button></div>`).join('')+'<div class="hint">“Only” plays this take and mutes the others. For a comp, split the takes with the scissors at the phrase edges and pick the best piece of each.</div>';
+    box.appendChild(d);
+    d.querySelectorAll('.tkrow').forEach(row=>{
+      const x=t.regions.find(q=>q.id===+row.dataset.id);
+      row.querySelector('.tkn').onclick=()=>{selectRegion(x);renderAll()};
+      row.querySelector('.tkonly').onclick=()=>{pushUndo();grp.forEach(y=>{y.mute=y!==x});afterTake()};
+      row.querySelector('.tkm').onclick=()=>{pushUndo();x.mute=!x.mute;afterTake()};
+    });
+  }
+  function afterTake(){renderLanes();renderInspector();changed();if(S.playing)S._resync=true}
 })();
 
 </script>
