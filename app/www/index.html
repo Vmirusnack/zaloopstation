@@ -528,6 +528,14 @@ html.phone body{position:fixed;inset:0}
 .oskpad b{font-size:12px;text-align:center;padding:0 4px}.oskpad small{color:var(--dim);font:10px var(--mono)}
 .oskpad.on{background:linear-gradient(var(--acc1),var(--acc2));color:var(--onaccent);transform:translateY(2px);box-shadow:none}
 .phone .oskbar .mini{height:30px;min-width:38px}
+/* ============ Sound health window ============ */
+#dgwin{position:fixed;left:50%;top:60px;transform:translateX(-50%);z-index:58;background:var(--panel);border:1px solid var(--edge);border-radius:var(--r3);box-shadow:0 22px 60px rgba(0,0,0,.6);width:min(640px,calc(100vw - 20px));max-height:calc(100vh - 80px);overflow:auto}
+#dgwin[hidden]{display:none}#dgwin .cwh{cursor:default;position:sticky;top:0;z-index:2}
+.dgr{display:grid;grid-template-columns:170px minmax(0,1fr);gap:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.dgr span{color:var(--dim)}.dgr b{font-weight:500;word-break:break-word}
+#dgwin .btnrow{display:flex;gap:6px;margin-top:12px}
+.phone #dgwin{top:4px;max-height:calc(100vh - 8px)}
+.phone .dgr{grid-template-columns:120px minmax(0,1fr)}
 </style>
 <div id="app">
   <header id="top">
@@ -763,6 +771,7 @@ html.phone body{position:fixed;inset:0}
     <tr><td>My synth presets</td><td>In the Wavetable Synth the Save ▾ button stores the current sound as your own preset (shown under “My presets”), overwrites, renames or deletes it, and exports or imports all presets as a .json file. They live in this browser; export them to keep a backup or move them to another computer. Acid Synth tracks have the same under My presets ▾.</td></tr>
     <tr><td>Level meters</td><td>Stereo meters with peak hold, a peak number and a clip lamp on every mixer strip, the buses and the master, plus a wide one in the toolbar. Click a meter to reset its peak and clip, right-click to cycle the style. Styles: Tri-colour LED, Classic LED, LCD blue, LCD amber dots and Boombox 90s (the list next to Single in the mixer).</td></tr>
     <tr><td>Key Harmonizer</td><td>An insert effect for any track (synth, sample, loop), a bus or the master. It moves the partials of the sound onto the notes of the chosen Key and Scale, so a bright lead or a sampled loop stays rich but fits the key. Snap sets how strongly, Low cut leaves the bass and kick untouched, Mix blends with the original. The display shows the sound with the notes of the scale marked (the root in gold). Fast mode adds about 21 ms of delay and High about 43 ms; the other tracks are delayed to match, so everything stays in time (exports are shifted back). It works best on melodic parts; on a whole mix it can raise peaks. <b>Automation:</b> Key, Scale, Snap, Low cut, Mix and Output can be automated on a track (first Key Harmonizer insert). Press A for the automation view, choose “Key Harmonizer · …” in the list next to Auto, and click the lane to add points; Key and Scale step from point to point. Or set the track to Touch / Latch / Write and turn the knobs while the song plays. The knobs follow the curve.</td></tr>
+    <tr><td>Sound health</td><td>Appearance ▸ Sound and performance ▸ Sound health… counts dropouts, page freezes and stuck notes and gives a report you can copy. A note that is held for more than 25 seconds with no key down is released automatically; there is also a limit on how many voices sound at once</td></tr>
     <tr><td>Hanging notes and crackle</td><td>Esc releases every note you are holding. Press Stop again while stopped to cut everything that still sounds (“panic”). Notes from the computer keyboard also work with a Ukrainian or Russian layout. If the sound crackles, open Appearance ▸ Sound and performance and set Audio buffer to Safe (reload the page after), and turn on Light visuals. The app warns you when it notices the sound breaking up.</td></tr>
     <tr><td>Rainbow sounds</td><td>Wavetable Synth presets “Rainbow lead (glide)”, “Rainbow dive” and “Rainbow rise”: a fast pitch envelope on a thick saw stack makes the harmonics fan out (dive falls, rise climbs, the lead slides between overlapping notes). Put a Key Harmonizer after them to tune the sweep into the key. The “Rainbow Drop” template shows it all at 200 BPM.</td></tr>
     <tr><td>Synth FX tab</td><td>The Wavetable Synth has an <b>FX</b> tab with eight slots that run in order after the voice: Distortion, Chorus, Flanger, Phaser, Delay (ms or tempo-synced, ping-pong), Reverb, EQ, Filter and Compressor. Click a slot to edit it, use the power button to bypass it and ◀ ▶ to change the order. Each effect has its own LFO (sine, triangle, saw, square, free or tempo-synced) that can move one of its parameters. Effects are saved with the preset.</td></tr>
@@ -4270,13 +4279,14 @@ function renderAppear(){
     <div class="aphint">If the sound crackles or notes hang, choose Safe. Fast is best for playing a MIDI keyboard on a strong computer. The change is applied when the page is reloaded.</div>
     <div class="row"><label>Light visuals</label><input type="checkbox" id="eco"${PREF.eco?' checked':''} aria-label="Light visuals"></div>
     <div class="aphint">Meters and the moving piano roll redraw less often. This frees the processor for the sound.</div>
-    <div class="btnrow"><button class="mini" id="perfTest">Check my computer</button></div><div class="aphint" id="perfOut">Measures how fast this computer renders the current project and shows audio glitches.</div></div>
+    <div class="btnrow"><button class="mini" id="perfTest">Check my computer</button><button class="mini" id="dgOpen">Sound health…</button></div><div class="aphint" id="perfOut">Measures how fast this computer renders the current project and shows audio glitches.</div></div>
   </div>`;
   bindAppear();
 }
 function bindAppear(){
   const q=s=>$(s);
   q('apX').onclick=()=>{$('appear').hidden=true};
+  q('dgOpen').onclick=()=>window.dgToggle(true);
   q('perfTest').onclick=async()=>{
     const out=q('perfOut'),b=q('perfTest');b.disabled=true;out.textContent='Measuring…';
     try{
@@ -8488,6 +8498,7 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
     if(force||!root.firstChild||sigNow()!==OSK.sig)build();
   };
   window.oskReleaseAll=releaseAll;
+  window.oskHeld=()=>[...OSK.down.values()].map(o=>o.n);
   // hook into the app: tab, pane, layout, and re-render when the selected track changes
   const tab=$k('tabKeys');if(tab)tab.onclick=()=>openBottom('keys');
   const lb=window.layoutBottom;
@@ -8502,6 +8513,115 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   window.addEventListener('resize',()=>{if(bottomOpen&&bottomMode==='keys')setTimeout(()=>window.renderKeys(false),150)});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseAll()});
   layoutBottom();
+})();
+
+</script>
+<script>
+/* ============ Sound health: dropout counters, voice cap, stuck-note guard, report ============ */
+(function(){
+  const DG={t0:Date.now(),drops:0,dropWorst:0,stalls:0,stallWorst:0,orphans:0,liveCut:0,steals:0,peak:0,fps:0,ev:[]};
+  const hc=navigator.hardwareConcurrency||4;
+  const CAP=hc<=4?56:hc<=8?80:128;
+  const ev=(k,v)=>{DG.ev.push(Math.round((Date.now()-DG.t0)/1000)+'s  '+k+(v?' '+v:'')+'  · voices '+voices.size+(S.playing?' · playing':''));if(DG.ev.length>14)DG.ev.shift()};
+  window.DG=DG;
+
+  // 1. the audio clock must keep up with the wall clock; when it falls behind the sound breaks up
+  let aw=0,aa=0;
+  setInterval(()=>{
+    if(typeof ac==='undefined'||!ac||ac.state!=='running'||document.hidden){aw=0;return}
+    const w=performance.now(),a=ac.currentTime;
+    if(aw){const lag=(w-aw)/1000-(a-aa);if(lag>.03){DG.drops++;DG.dropWorst=Math.max(DG.dropWorst,lag);ev('audio late by',Math.round(lag*1000)+' ms')}}
+    aw=w;aa=a;
+  },1000);
+  // 2. the page itself must not freeze (the note scheduler runs on the page)
+  let sw=performance.now();
+  setInterval(()=>{const n=performance.now(),d=n-sw-100;sw=n;if(document.hidden)return;if(d>120){DG.stalls++;DG.stallWorst=Math.max(DG.stallWorst,d);ev('page froze for',Math.round(d)+' ms')}},100);
+  let fc=0,ft=performance.now();
+  (function tick(){fc++;const n=performance.now();if(n-ft>=1000){DG.fps=Math.round(fc*1000/(n-ft));fc=0;ft=n}requestAnimationFrame(tick)})();
+
+  // 3. voice cap (oldest released voice first) and a guard for voices nobody will ever release
+  const sv=window.startVoice;
+  window.startVoice=function(){
+    const v=sv.apply(this,arguments);
+    if(v&&typeof v.off==='function'){
+      v.__t=performance.now();v.__o=false;const o=v.off;v.off=function(){v.__o=true;return o.apply(this,arguments)};
+      if(voices.size>DG.peak)DG.peak=voices.size;
+      if(voices.size>CAP){
+        let n=0;
+        for(const x of [...voices]){if(voices.size<=CAP-4)break;if(x!==v&&x.__o){try{x.kill&&x.kill()}catch(e){}voices.delete(x);n++}}
+        for(const x of [...voices]){if(voices.size<=CAP-4)break;if(x!==v){try{x.kill&&x.kill()}catch(e){}voices.delete(x);n++}}
+        if(n){DG.steals+=n;ev('too many voices, released',n)}
+      }
+    }
+    return v;
+  };
+  const liveT={};const lo=window.liveOn;
+  window.liveOn=function(p){const r=lo.apply(this,arguments);if(live[p])liveT[p]=performance.now();return r};
+  setInterval(()=>{
+    if(typeof ac==='undefined'||!ac)return;
+    const n=performance.now(),liveV=new Set(Object.keys(live).map(k=>live[k]));
+    voices.forEach(v=>{if(v.__o===false&&!liveV.has(v)&&n-v.__t>1500){try{v.off(ac.currentTime)}catch(e){}DG.orphans++;ev('stuck note released')}});
+    const held=new Set(Object.keys(HELD).map(k=>+HELD[k]));if(typeof oskHeld==='function')oskHeld().forEach(x=>held.add(x));
+    Object.keys(live).forEach(k=>{const p=+k;if(!live[p]){delete liveT[p];return}if(!liveT[p])liveT[p]=n;
+      if(n-liveT[p]>25000&&!held.has(p)){try{liveOff(p)}catch(e){}delete liveT[p];DG.liveCut++;ev('held note released after 25 s',noteName(p))}else if(!live[p])delete liveT[p]});
+  },1000);
+
+  // 4. the window
+  function gpu(){try{const c=document.createElement('canvas'),g=c.getContext('webgl')||c.getContext('experimental-webgl');if(!g)return 'no WebGL (hardware acceleration may be off)';const e=g.getExtension('WEBGL_debug_renderer_info');return e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown'}catch(e){return 'unknown'}}
+  const GPU=gpu(),SOFT=/swiftshader|llvmpipe|software|basic render|no webgl/i.test(GPU);
+  function rows(){
+    const r=[];const A=typeof ac!=='undefined'&&ac;
+    const ps=A&&A.playoutStats?A.playoutStats:null;
+    const nodes=S.tracks.map(t=>t.type+':'+(t.regions||[]).reduce((a,x)=>a+x.notes.length,0)+'n/'+((t.fx||[]).length)+'fx').join(', ');
+    r.push(['Uptime',Math.round((Date.now()-DG.t0)/1000)+' s']);
+    r.push(['Browser',navigator.userAgent.replace(/^Mozilla\/5.0 /,'').slice(0,120)]);
+    r.push(['Processor / memory',(navigator.hardwareConcurrency||'?')+' threads'+(navigator.deviceMemory?' · '+navigator.deviceMemory+' GB':'')]);
+    r.push(['Graphics',GPU+(SOFT?'  ← software drawing: the page is drawn by the processor, which steals time from the sound':'')]);
+    r.push(['Audio',A?((A.sampleRate|0)+' Hz · '+A.state+' · buffer '+(A.baseLatency?Math.round(A.baseLatency*1000):'?')+' ms · output '+(A.outputLatency?Math.round(A.outputLatency*1000):'?')+' ms'):'not started yet (press play)']);
+    r.push(['Settings','audio buffer '+PREF.abuf+' · light visuals '+(PREF.eco?'on':'off')+' · layout '+(document.documentElement.classList.contains('phone')?'phone':'desktop')]);
+    if(ps)r.push(['Browser-reported dropouts',ps.underrunEvents+' events, '+Math.round(ps.underrunDuration*1000)+' ms in total']);
+    r.push(['Audio late (seen by the app)',DG.drops+' times'+(DG.drops?', worst '+Math.round(DG.dropWorst*1000)+' ms':'')]);
+    r.push(['Page freezes',DG.stalls+' times'+(DG.stalls?', worst '+Math.round(DG.stallWorst)+' ms':'')]);
+    r.push(['Drawing speed',DG.fps+' frames per second']);
+    r.push(['Voices','now '+voices.size+' · peak '+DG.peak+' · limit '+CAP+' · released by the limit '+DG.steals]);
+    r.push(['Stuck notes released',DG.orphans+' voices, '+DG.liveCut+' held notes']);
+    const lv=Object.keys(live).filter(k=>live[k]).map(k=>noteName(+k));r.push(['Notes held now',lv.length?lv.join(' '):'none']);
+    r.push(['Project',S.tracks.length+' tracks: '+nodes]);
+    return r;
+  }
+  function hints(){
+    const h=[];
+    if(!DG.drops&&!DG.stalls)h.push('No dropouts or freezes seen so far. Play the project for a minute and look again.');
+    if(DG.stalls&&DG.stalls>=DG.drops)h.push('The page freezes. Turn on Light visuals, close other browser tabs and heavy programs, and keep the laptop plugged in with the power plan set to high performance.');
+    if(DG.drops&&PREF.abuf!=='safe')h.push('The sound falls behind. Set Audio buffer to Safe (Appearance ▸ Sound and performance) and reload.');
+    if(DG.drops&&PREF.abuf==='safe')h.push('The sound falls behind even with the Safe buffer. Mute or freeze heavy tracks (Wavetable synth, Harmonic Distortion, Rumble, OTT and Autotune cost the most), or reduce unison.');
+    if(SOFT)h.push('The browser draws without a graphics card. In Chrome: Settings ▸ System ▸ turn on “Use graphics acceleration when available”, then restart the browser.');
+    if(DG.orphans||DG.liveCut)h.push('Some notes were stuck and were released automatically. Tell me how it happened (which keys or which instrument).');
+    return h;
+  }
+  let box=null,timer=null;
+  function html(){
+    return '<div class="cwh"><b>Sound health</b><span class="eqsub">counts since the page was opened</span><span class="sp"></span><button class="tb" id="dgPanic" title="Release every sounding note">Release all notes</button><button class="tb" id="dgReset">Reset</button><button class="tb" id="dgClose" aria-label="Close">✕</button></div>'
+     +'<div class="mdbody">'+rows().map(x=>'<div class="dgr"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')
+     +'<div class="mdhint">'+hints().map(esc).join('<br>')+'</div>'
+     +'<div class="mdmon"><div class="mdh">Last events</div>'+(DG.ev.length?DG.ev.map(l=>'<div>'+esc(l)+'</div>').join(''):'<div class="mdd">None yet.</div>')+'</div>'
+     +'<div class="btnrow"><button class="mini" id="dgCopy">Copy report</button><button class="mini" id="dgSafe" title="Safe buffer + Light visuals">Use safe settings</button></div></div>';
+  }
+  function report(){return 'Loop Studio sound report\n'+rows().map(x=>x[0]+': '+x[1]).join('\n')+'\nEvents:\n'+DG.ev.join('\n')}
+  function draw(){
+    if(!box||box.hidden)return;const keep=box.querySelector('.mdbody')?box.querySelector('.mdbody').scrollTop:0;box.innerHTML=html();const b=box.querySelector('.mdbody');if(b)b.scrollTop=keep;
+    box.querySelector('#dgClose').onclick=()=>window.dgToggle(false);
+    box.querySelector('#dgPanic').onclick=()=>{try{panic()}catch(e){}draw()};
+    box.querySelector('#dgReset').onclick=()=>{Object.assign(DG,{drops:0,dropWorst:0,stalls:0,stallWorst:0,orphans:0,liveCut:0,steals:0,peak:voices.size,ev:[]});draw()};
+    box.querySelector('#dgSafe').onclick=()=>{PREF.abuf='safe';PREF.eco=true;try{savePrefs()}catch(e){}toast('Safe buffer and Light visuals saved. Reload the page to apply the buffer');draw()};
+    box.querySelector('#dgCopy').onclick=async()=>{const t=report();try{await navigator.clipboard.writeText(t);toast('Report copied')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Report copied')}catch(x){toast('Select and copy the text manually')}ta.remove()}};
+  }
+  window.dgToggle=function(on){
+    if(!box){box=document.createElement('div');box.id='dgwin';box.hidden=true;document.body.appendChild(box)}
+    const show=on===undefined?box.hidden:on;box.hidden=!show;clearInterval(timer);
+    if(show){draw();timer=setInterval(draw,1000)}
+  };
+  window.dgReport=report;
 })();
 
 </script>
