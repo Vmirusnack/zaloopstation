@@ -2,9 +2,13 @@
 #pragma once
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <vector>
 
 namespace ls
@@ -14,23 +18,219 @@ constexpr int kTable = 2048;   // samples per table
 constexpr int kFrames = 16;    // wavetable positions
 constexpr int kMips = 10;      // band-limited copies (one per octave)
 constexpr int kTopHarm = 512;  // harmonics in the richest copy
-constexpr int kSets = 4;
+constexpr int kSets = 4;          // built-in tables
+constexpr int kCustom = 4;        // user slots (tables loaded from .wav files)
+constexpr int kTables = kSets + kCustom;
+constexpr int kMaxFrames = 256;   // frames in a user table
 constexpr int kMaxUni = 7;
 constexpr int kVoices = 16;
+constexpr int kNumLfo = 3;
+constexpr int kNumMod = 8;
+constexpr int kNumSrc = 10;       // 0 none, 1-3 LFO, 4 filter env, 5 amp env, 6 velocity, 7 key, 8 mod wheel, 9 random
+constexpr int kNumDst = 11;       // 0 none, 1 A pos, 2 B pos, 3 A pitch, 4 B pitch, 5 pitch all, 6 cutoff, 7 resonance, 8 A level, 9 B level, 10 sub
+constexpr double kDivBeats[8] = { 16, 8, 4, 2, 1, 0.5, 0.25, 0.125 };
 
 inline double pow2 (double x) { return std::exp2 (x); }
 
 // ---------------------------------------------------------------- wavetables
+// One table = `frames` single-cycle frames, each stored as kMips band-limited copies (one per octave).
+struct TSet
+{
+    int frames = 1;
+    int topHarm = kTopHarm;           // harmonics in mip 0
+    std::string name;
+    std::vector<float> data;          // [frame][mip][kTable + 1]
+
+    const float* at (int frame, int mip) const { return &data[(((size_t) frame * kMips + mip) * (kTable + 1))]; }
+    float* atW (int frame, int mip) { return &data[(((size_t) frame * kMips + mip) * (kTable + 1))]; }
+};
+
+// in-place radix-2 FFT (n power of two)
+inline void fft (std::vector<double>& re, std::vector<double>& im, bool inverse)
+{
+    const size_t n = re.size();
+    for (size_t i = 1, j = 0; i < n; ++i)
+    {
+        size_t bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) { std::swap (re[i], re[j]); std::swap (im[i], im[j]); }
+    }
+    for (size_t len = 2; len <= n; len <<= 1)
+    {
+        const double ang = 2.0 * kPi / (double) len * (inverse ? 1.0 : -1.0);
+        const double wr = std::cos (ang), wi = std::sin (ang);
+        for (size_t i = 0; i < n; i += len)
+        {
+            double cr = 1, ci = 0;
+            for (size_t k = 0; k < len / 2; ++k)
+            {
+                const size_t a = i + k, b = i + k + len / 2;
+                const double xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+                re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+                const double t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+            }
+        }
+    }
+    if (inverse) for (size_t i = 0; i < n; ++i) { re[i] /= (double) n; im[i] /= (double) n; }
+}
+
+// frames: nf * kTable raw samples (already normalised). Builds the band-limited copies.
+inline std::unique_ptr<TSet> buildTableSet (const float* frames, int nf, const std::string& name)
+{
+    auto t = std::make_unique<TSet>();
+    nf = std::clamp (nf, 1, kMaxFrames);
+    t->frames = nf; t->topHarm = kTable / 2; t->name = name;
+    t->data.assign ((size_t) nf * kMips * (kTable + 1), 0.0f);
+    std::vector<double> re (kTable), im (kTable), r2 (kTable), i2 (kTable);
+    for (int f = 0; f < nf; ++f)
+    {
+        for (int i = 0; i < kTable; ++i) { re[(size_t) i] = frames[(size_t) f * kTable + i]; im[(size_t) i] = 0; }
+        fft (re, im, false);
+        re[0] = 0; im[0] = 0;
+        for (int m = 0; m < kMips; ++m)
+        {
+            const int H = (kTable / 2) >> m;
+            for (int k = 0; k < kTable; ++k)
+            {
+                const int kk = k <= kTable / 2 ? k : kTable - k;
+                if (kk <= H) { r2[(size_t) k] = re[(size_t) k]; i2[(size_t) k] = im[(size_t) k]; } else { r2[(size_t) k] = 0; i2[(size_t) k] = 0; }
+            }
+            fft (r2, i2, true);
+            float* d = t->atW (f, m);
+            for (int i = 0; i < kTable; ++i) d[i] = (float) r2[(size_t) i];
+            d[kTable] = d[0];
+        }
+    }
+    return t;
+}
+
+// ---------------------------------------------------------------- .wav reading (PCM 8/16/24/32, float 32/64; Serum "clm " frame size)
+struct WavData { std::vector<float> mono; int frameSize = 0; int sampleRate = 0; };
+
+inline bool parseWav (const uint8_t* d, size_t n, WavData& out)
+{
+    auto u16 = [&] (size_t o) -> uint32_t { return o + 2 <= n ? (uint32_t) d[o] | ((uint32_t) d[o + 1] << 8) : 0; };
+    auto u32 = [&] (size_t o) -> uint32_t { return o + 4 <= n ? (uint32_t) d[o] | ((uint32_t) d[o + 1] << 8) | ((uint32_t) d[o + 2] << 16) | ((uint32_t) d[o + 3] << 24) : 0; };
+    if (n < 44 || std::memcmp (d, "RIFF", 4) != 0 || std::memcmp (d + 8, "WAVE", 4) != 0) return false;
+    size_t pos = 12, dataOff = 0, dataLen = 0;
+    uint32_t tag = 0, ch = 0, bits = 0, sr = 0, ext = 0;
+    bool haveFmt = false, haveData = false;
+    out.frameSize = 0;
+    while (pos + 8 <= n)
+    {
+        const uint32_t sz = u32 (pos + 4);
+        const size_t b = pos + 8;
+        if (std::memcmp (d + pos, "fmt ", 4) == 0) { tag = u16 (b); ch = u16 (b + 2); sr = u32 (b + 4); bits = u16 (b + 14); ext = sz >= 26 ? u16 (b + 24) : 0; haveFmt = true; }
+        else if (std::memcmp (d + pos, "data", 4) == 0) { dataOff = b; dataLen = std::min ((size_t) sz, n - b); haveData = true; }
+        else if (std::memcmp (d + pos, "clm ", 4) == 0)
+        {
+            // text like "<!>2048 00000000 wav": frame size follows "<!>"
+            const size_t e = std::min (n, b + std::min ((size_t) sz, (size_t) 40));
+            for (size_t i = b; i + 3 < e; ++i)
+                if (d[i] == '<' && d[i + 1] == '!' && d[i + 2] == '>')
+                {
+                    int v = 0; size_t k = i + 3; while (k < e && d[k] == ' ') ++k;
+                    while (k < e && d[k] >= '0' && d[k] <= '9') { v = v * 10 + (d[k] - '0'); ++k; }
+                    out.frameSize = v; break;
+                }
+        }
+        pos = b + sz + (sz & 1u);
+    }
+    if (! haveFmt || ! haveData || ch == 0 || bits == 0) return false;
+    const uint32_t t = tag == 0xFFFE ? ext : tag;
+    const uint32_t bps = bits >> 3;
+    if ((t != 1 && t != 3) || bps == 0 || bps > 8) return false;
+    const size_t frames = dataLen / ((size_t) bps * ch);
+    out.sampleRate = (int) sr;
+    out.mono.assign (frames, 0.0f);
+    for (size_t i = 0; i < frames; ++i)
+    {
+        double acc = 0;
+        for (uint32_t c = 0; c < ch; ++c)
+        {
+            const uint8_t* q = d + dataOff + (i * ch + c) * bps;
+            double v;
+            if (t == 3)
+            {
+                if (bps == 8) { uint64_t x = 0; for (int k = 7; k >= 0; --k) x = (x << 8) | q[k]; double f; std::memcpy (&f, &x, 8); v = f; }
+                else { uint32_t x = (uint32_t) q[0] | ((uint32_t) q[1] << 8) | ((uint32_t) q[2] << 16) | ((uint32_t) q[3] << 24); float f; std::memcpy (&f, &x, 4); v = f; }
+            }
+            else if (bps == 2) v = (int16_t) ((uint16_t) q[0] | ((uint16_t) q[1] << 8)) / 32768.0;
+            else if (bps == 3) { int32_t x = (int32_t) (q[0] | (q[1] << 8) | (q[2] << 16)); if (x & 0x800000) x -= 0x1000000; v = x / 8388608.0; }
+            else if (bps == 4) v = (int32_t) ((uint32_t) q[0] | ((uint32_t) q[1] << 8) | ((uint32_t) q[2] << 16) | ((uint32_t) q[3] << 24)) / 2147483648.0;
+            else v = (q[0] - 128) / 128.0;
+            acc += v;
+        }
+        out.mono[i] = (float) (acc / ch);
+    }
+    return true;
+}
+
+// raw audio -> normalised wavetable frames (nf * kTable). Single cycles (short files) become one frame.
+inline std::vector<float> framesFromAudio (const std::vector<float>& a, int frameSize, int& nf)
+{
+    const int L = (int) a.size();
+    nf = 0;
+    if (L < 64) return {};
+    const int FS = frameSize >= 64 ? frameSize : kTable;
+    std::vector<float> out;
+    if (L >= std::max (3072, (int) (FS * 1.5)) || (frameSize > 0 && L >= FS * 2))
+    {
+        const int total = L / FS;
+        nf = std::min (total, kMaxFrames);
+        out.assign ((size_t) nf * kTable, 0.0f);
+        for (int f = 0; f < nf; ++f)
+        {
+            const int src = total > kMaxFrames ? (int) std::lround (f * (double) (total - 1) / (kMaxFrames - 1)) : f;
+            const float* o = a.data() + (size_t) src * FS;
+            for (int i = 0; i < kTable; ++i)
+            {
+                if (FS == kTable) out[(size_t) f * kTable + i] = o[i];
+                else { const double x = (double) i / kTable * FS; const int k = (int) x; const float fr = (float) (x - k); out[(size_t) f * kTable + i] = o[k] * (1 - fr) + o[std::min (FS - 1, k + 1)] * fr; }
+            }
+        }
+    }
+    else
+    {
+        nf = 1; out.assign ((size_t) kTable, 0.0f);
+        for (int i = 0; i < kTable; ++i) { const double x = (double) i / kTable * L; const int j = (int) x; const float f = (float) (x - j); out[(size_t) i] = a[(size_t) j] * (1 - f) + a[(size_t) std::min (L - 1, j + 1)] * f; }
+    }
+    double mean = 0; for (float v : out) mean += v; mean /= (double) out.size();
+    double pk = 1e-9; for (auto& v : out) { v = (float) (v - mean); pk = std::max (pk, (double) std::fabs (v)); }
+    for (auto& v : out) v = (float) (v / pk * 0.95);
+    return out;
+}
+
 struct Tables
 {
-    std::vector<float> data;
+    std::vector<std::unique_ptr<TSet>> builtin;
+    std::atomic<const TSet*> custom[kCustom];
 
-    Tables() { build(); }
+    Tables() { for (auto& c : custom) c.store (nullptr); build(); }
 
-    const float* at (int set, int frame, int mip) const
+    // message thread: publish a user table; the audio thread picks it up with one pointer read.
+    // The previous table stays alive for a few more swaps so a running block never sees freed memory.
+    void setCustom (int slot, std::unique_ptr<TSet> t)
     {
-        return &data[((((size_t) set * kFrames + frame) * kMips + mip) * (kTable + 1))];
+        if (slot < 0 || slot >= kCustom) return;
+        std::lock_guard<std::mutex> lk (mtx);
+        const TSet* raw = t.get();
+        if (own[slot]) grave.push_back (std::move (own[slot]));
+        own[slot] = std::move (t);
+        custom[slot].store (raw, std::memory_order_release);
+        while (grave.size() > 6) grave.erase (grave.begin());
     }
+    void clearCustom (int slot) { setCustom (slot, nullptr); }
+
+    const TSet* get (int table) const
+    {
+        table = std::clamp (table, 0, kTables - 1);
+        if (table < kSets) return builtin[(size_t) table].get();
+        const TSet* c = custom[table - kSets].load (std::memory_order_acquire);
+        return c ? c : builtin[0].get();
+    }
+    bool hasCustom (int slot) const { return slot >= 0 && slot < kCustom && custom[slot].load() != nullptr; }
 
     static const char* setName (int s)
     {
@@ -61,14 +261,21 @@ struct Tables
     }
 
 private:
+    std::mutex mtx;
+    std::unique_ptr<TSet> own[kCustom];
+    std::vector<std::unique_ptr<TSet>> grave;
+
     void build()
     {
-        data.assign ((size_t) kSets * kFrames * kMips * (kTable + 1), 0.0f);
         std::vector<float> sinT (kTable);
         for (int i = 0; i < kTable; ++i) sinT[(size_t) i] = (float) std::sin (2.0 * kPi * i / kTable);
         std::vector<double> tmp (kTable);
 
         for (int s = 0; s < kSets; ++s)
+        {
+            auto ts = std::make_unique<TSet>();
+            ts->frames = kFrames; ts->topHarm = kTopHarm; ts->name = setName (s);
+            ts->data.assign ((size_t) kFrames * kMips * (kTable + 1), 0.0f);
             for (int f = 0; f < kFrames; ++f)
             {
                 const double t = f / (double) (kFrames - 1);
@@ -89,11 +296,13 @@ private:
                         for (double v : tmp) pk = std::max (pk, std::fabs (v));
                         scale = pk > 0 ? 0.9 / pk : 1.0;
                     }
-                    float* d = const_cast<float*> (at (s, f, m));
+                    float* d = ts->atW (f, m);
                     for (int i = 0; i < kTable; ++i) d[i] = (float) (tmp[(size_t) i] * scale);
                     d[kTable] = d[0];
                 }
             }
+            builtin.push_back (std::move (ts));
+        }
     }
 };
 
@@ -119,6 +328,9 @@ struct P
     float posEnv = 0, glide = 0, bend = 2, master = 0.7f, dist = 0, velSens = 0.6f;
     int dtype = 0;
     bool mono = false;
+    struct Lfo { int shape = 0; float rate = 2.0f; bool sync = false; int div = 4; } lfo[kNumLfo];
+    struct Mod { int src = 0, dst = 0; float amt = 0; } mod[kNumMod];
+    double bpm = 120;
 };
 
 // ---------------------------------------------------------------- envelope
@@ -189,6 +401,8 @@ struct Voice
     double pitch = 60, pitchT = 60;
     uint64_t age = 0;
     double phA[kMaxUni] = {}, phB[kMaxUni] = {}, phSub = 0;
+    double lfoPh[kNumLfo] = {};
+    float lfoSh[kNumLfo] = {}, rnd = 0;
     Env amp, fenv;
     Ladder lad[2];
 };
@@ -201,12 +415,19 @@ struct BlockCtx
     float gl[2][kMaxUni], gr[2][kMaxUni];
     float uniNorm[2];
     double bendSemis = 0, modw = 0;
+    double lfoInc[kNumLfo] = {};
+    bool anyMod = false;
+    int nSlots = 0, slotSrc[kNumMod] = {}, slotDst[kNumMod] = {};
+    float slotAmt[kNumMod] = {};
 };
 
 class Synth
 {
 public:
     Synth() : tables (std::make_unique<Tables>()) {}
+
+    Tables& bank() { return *tables; }
+    const Tables& bank() const { return *tables; }
 
     void prepare (double sampleRate)
     {
@@ -285,6 +506,16 @@ public:
         c.glideC = p.glide > 0.001f ? 1.0 - std::exp (-1.0 / (p.glide * sr)) : 1.0;
         c.bendSemis = bendNorm * p.bend;
         c.modw = modw;
+        for (int l = 0; l < kNumLfo; ++l)
+        {
+            const auto& lp = p.lfo[l];
+            const double hz = lp.sync ? (std::max (20.0, p.bpm) / 60.0) / kDivBeats[std::clamp (lp.div, 0, 7)] : (double) lp.rate;
+            c.lfoInc[l] = std::clamp (hz, 0.0, 200.0) / sr;
+        }
+        for (int m = 0; m < kNumMod; ++m)
+            if (p.mod[m].src > 0 && p.mod[m].dst > 0 && std::fabs (p.mod[m].amt) > 0.0005f)
+            { c.slotSrc[c.nSlots] = std::clamp (p.mod[m].src, 0, kNumSrc - 1); c.slotDst[c.nSlots] = std::clamp (p.mod[m].dst, 0, kNumDst - 1); c.slotAmt[c.nSlots] = p.mod[m].amt; ++c.nSlots; }
+        c.anyMod = c.nSlots > 0;
         const OscP* os[2] = { &p.a, &p.b };
         for (int o = 0; o < 2; ++o)
         {
@@ -351,35 +582,54 @@ private:
         v.gate = true; v.sus = false; v.active = true; v.age = ++counter;
         for (int j = 0; j < kMaxUni; ++j) { v.phA[j] = p.rndPhase * rand01(); v.phB[j] = p.rndPhase * rand01(); }
         v.phSub = 0;
+        for (int l = 0; l < kNumLfo; ++l) { v.lfoPh[l] = 0; v.lfoSh[l] = (float) (rand01() * 2.0 - 1.0); }
+        v.rnd = (float) (rand01() * 2.0 - 1.0);
         v.amp.on(); v.fenv.on();
         v.fenv.v = 0;
         if (! v.lad[0].z[0] && ! v.lad[0].z[3]) { /* fresh voice: filters already clear */ }
     }
 
-    static inline int mipFor (double f, double sr)
+    static inline int mipFor (double f, double sr, int topHarm)
     {
         const double maxAllowed = sr * 0.5 / std::max (1.0, f);
         int m = 0;
-        while (m < kMips - 1 && (kTopHarm >> m) > maxAllowed) ++m;
+        while (m < kMips - 1 && (topHarm >> m) > maxAllowed) ++m;
         return m;
     }
 
-    inline void oscSum (const OscP& o, int idx, double* ph, double fBase, float pos, const BlockCtx& c, float& l, float& r) const
+    static inline float lfoShape (int shape, double ph, float sh)
+    {
+        switch (shape)
+        {
+            case 1: return (float) (ph < 0.5 ? 4.0 * ph - 1.0 : 3.0 - 4.0 * ph);
+            case 2: return (float) (2.0 * ph - 1.0);
+            case 3: return ph < 0.5 ? 1.0f : -1.0f;
+            case 4: return sh;
+            default: return (float) std::sin (2.0 * kPi * ph);
+        }
+    }
+
+    inline void oscSum (const OscP& o, int idx, double* ph, double fBase, float pos, float level, double semis, const BlockCtx& c, float& l, float& r) const
     {
         const int un = std::clamp (o.uni, 1, kMaxUni);
-        const double f0 = fBase * pow2 (o.oct + o.fine / 1200.0), inv = 1.0 / sr;
-        const double fp = std::clamp ((double) pos, 0.0, 1.0) * (kFrames - 1);
-        int fi = (int) fp; if (fi >= kFrames - 1) fi = kFrames - 2;
-        const float ff = (float) (fp - fi);
+        const TSet* ts = tables->get (o.table);
+        const double f0 = fBase * pow2 (o.oct + o.fine / 1200.0 + semis / 12.0), inv = 1.0 / sr;
+        int fi = 0, f1 = 0; float ff = 0;
+        if (ts->frames > 1)
+        {
+            const double fp = std::clamp ((double) pos, 0.0, 1.0) * (ts->frames - 1);
+            fi = (int) fp; if (fi >= ts->frames - 1) fi = ts->frames - 2;
+            ff = (float) (fp - fi); f1 = fi + 1;
+        }
         for (int j = 0; j < un; ++j)
         {
             const double f = f0 * c.ratio[idx][j];
             ph[j] += f * inv; ph[j] -= std::floor (ph[j]);
-            const int m = mipFor (f, sr);
-            const float s = readTable (tables->at (o.table, fi, m), ph[j]) * (1.0f - ff) + readTable (tables->at (o.table, fi + 1, m), ph[j]) * ff;
+            const int m = mipFor (f, sr, ts->topHarm);
+            const float s = readTable (ts->at (fi, m), ph[j]) * (1.0f - ff) + (ff > 0 ? readTable (ts->at (f1, m), ph[j]) * ff : 0.0f);
             l += s * c.gl[idx][j]; r += s * c.gr[idx][j];
         }
-        l *= c.uniNorm[idx] * o.level; r *= c.uniNorm[idx] * o.level;
+        l *= c.uniNorm[idx] * level; r *= c.uniNorm[idx] * level;
     }
 
     void renderVoice (Voice& v, float* L, float* R, int n, const P& p, const BlockCtx& c)
@@ -392,17 +642,33 @@ private:
             const double ae = v.amp.tick (c.ea, sus), fe = v.fenv.tick (c.ef, fsus);
             if (v.amp.st == Env::Idle) { v.active = false; v.gate = false; v.lad[0].reset(); v.lad[1].reset(); return; }
             const double fBase = 440.0 * pow2 ((v.pitch + c.bendSemis - 69.0) / 12.0);
+            float md[kNumDst] = {};
+            if (c.anyMod)
+            {
+                float src[kNumSrc];
+                src[0] = 0;
+                for (int l = 0; l < kNumLfo; ++l)
+                {
+                    v.lfoPh[l] += c.lfoInc[l];
+                    if (v.lfoPh[l] >= 1.0) { v.lfoPh[l] -= std::floor (v.lfoPh[l]); v.lfoSh[l] = (float) (rand01() * 2.0 - 1.0); }
+                    src[1 + l] = lfoShape (p.lfo[l].shape, v.lfoPh[l], v.lfoSh[l]);
+                }
+                src[4] = (float) fe; src[5] = (float) ae; src[6] = v.vel; src[7] = (float) ((v.pitch - 60.0) / 36.0); src[8] = (float) c.modw; src[9] = v.rnd;
+                for (int m = 0; m < c.nSlots; ++m) md[c.slotDst[m]] += src[c.slotSrc[m]] * c.slotAmt[m];
+            }
             float al = 0, ar = 0, bl = 0, br = 0;
             const float pos = (float) std::clamp (p.posEnv * fe, -1.0, 1.0);
-            if (p.a.level > 0.0001f) oscSum (p.a, 0, v.phA, fBase, std::clamp (p.a.pos + pos, 0.0f, 1.0f), c, al, ar);
-            if (p.b.level > 0.0001f) oscSum (p.b, 1, v.phB, fBase, std::clamp (p.b.pos + pos, 0.0f, 1.0f), c, bl, br);
+            const float lvA = std::clamp (p.a.level + md[8], 0.0f, 1.5f), lvB = std::clamp (p.b.level + md[9], 0.0f, 1.5f);
+            if (lvA > 0.0001f) oscSum (p.a, 0, v.phA, fBase, std::clamp (p.a.pos + pos + md[1], 0.0f, 1.0f), lvA, (md[3] + md[5]) * 24.0, c, al, ar);
+            if (lvB > 0.0001f) oscSum (p.b, 1, v.phB, fBase, std::clamp (p.b.pos + pos + md[2], 0.0f, 1.0f), lvB, (md[4] + md[5]) * 24.0, c, bl, br);
             float sub = 0;
-            if (p.sub > 0.0001f) { v.phSub += fBase * 0.5 / sr; v.phSub -= std::floor (v.phSub); sub = (float) std::sin (2.0 * kPi * v.phSub) * p.sub; }
+            const float subLv = std::clamp (p.sub + md[10], 0.0f, 1.5f);
+            if (subLv > 0.0001f) { v.phSub += fBase * 0.5 / sr; v.phSub -= std::floor (v.phSub); sub = (float) std::sin (2.0 * kPi * v.phSub) * subLv; }
             float sl = (al + bl + sub) * 0.7f, sr2 = (ar + br + sub) * 0.7f;
 
-            const double octs = p.fenv * fe * 7.0 + p.fkey * (v.pitch - 60.0) / 12.0 + c.modw * 2.0;
+            const double octs = p.fenv * fe * 7.0 + p.fkey * (v.pitch - 60.0) / 12.0 + c.modw * 2.0 + md[6] * 5.0;
             const double fc = std::clamp ((double) cutA[(size_t) i] * pow2 (octs), 20.0, nyq);
-            const double g = std::tan (kPi * fc / sr), k = 4.0 * resA[(size_t) i], dr = std::max (1.0, (double) drvA[(size_t) i]);
+            const double g = std::tan (kPi * fc / sr), k = 4.0 * std::clamp ((double) resA[(size_t) i] + md[7], 0.0, 1.05), dr = std::max (1.0, (double) drvA[(size_t) i]);
             sl = (float) v.lad[0].process (sl, g, k, dr, p.ftype);
             sr2 = (float) v.lad[1].process (sr2, g, k, dr, p.ftype);
             const float amp = (float) ae * velG;

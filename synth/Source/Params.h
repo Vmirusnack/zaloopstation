@@ -5,6 +5,12 @@ namespace params
 {
 struct Def { const char* id; const char* name; const char* group; };
 
+inline const juce::StringArray& tableNames() { static const juce::StringArray n { "Saw - Square", "Sine - Saw", "Zaag Formant", "Digital", "User 1", "User 2", "User 3", "User 4" }; return n; }
+inline const juce::StringArray& lfoShapes()  { static const juce::StringArray n { "Sine", "Triangle", "Saw", "Square", "Sample & hold" }; return n; }
+inline const juce::StringArray& lfoDivs()    { static const juce::StringArray n { "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32" }; return n; }
+inline const juce::StringArray& modSources() { static const juce::StringArray n { "-", "LFO 1", "LFO 2", "LFO 3", "Filter env", "Amp env", "Velocity", "Key", "Mod wheel", "Random" }; return n; }
+inline const juce::StringArray& modDests()   { static const juce::StringArray n { "-", "A position", "B position", "A pitch", "B pitch", "Pitch (all)", "Cutoff", "Resonance", "A level", "B level", "Sub level" }; return n; }
+
 inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 {
     using APF = juce::AudioParameterFloat;
@@ -15,7 +21,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     using NR = juce::NormalisableRange<float>;
 
     juce::AudioProcessorValueTreeState::ParameterLayout l;
-    const juce::StringArray tables { "Saw - Square", "Sine - Saw", "Zaag Formant", "Digital" };
+    const juce::StringArray tables = tableNames();
 
     auto osc = [&] (const juce::String& p, const juce::String& n, float level)
     {
@@ -61,6 +67,22 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     l.add (std::make_unique<APC> (PID { "dtype", 1 }, "Distortion type", juce::StringArray { "Soft", "Hard", "Fold" }, 0));
     l.add (std::make_unique<APF> (PID { "dist", 1 }, "Distortion", NR (0.f, 1.f), 0.f));
     l.add (std::make_unique<APF> (PID { "master", 1 }, "Master", NR (0.f, 1.f), 0.7f));
+
+    for (int i = 1; i <= 3; ++i)
+    {
+        const juce::String p = "l" + juce::String (i) + "_", n = "LFO " + juce::String (i) + " ";
+        l.add (std::make_unique<APC> (PID { p + "shape", 1 }, n + "shape", lfoShapes(), 0));
+        l.add (std::make_unique<APF> (PID { p + "rate", 1 }, n + "rate", NR (0.02f, 40.f, 0.f, 0.35f), 2.f));
+        l.add (std::make_unique<APB> (PID { p + "sync", 1 }, n + "tempo sync", false));
+        l.add (std::make_unique<APC> (PID { p + "div", 1 }, n + "division", lfoDivs(), 4));
+    }
+    for (int i = 1; i <= 8; ++i)
+    {
+        const juce::String p = "m" + juce::String (i) + "_", n = "Mod " + juce::String (i) + " ";
+        l.add (std::make_unique<APC> (PID { p + "src", 1 }, n + "source", modSources(), 0));
+        l.add (std::make_unique<APC> (PID { p + "dst", 1 }, n + "destination", modDests(), 0));
+        l.add (std::make_unique<APF> (PID { p + "amt", 1 }, n + "amount", NR (-1.f, 1.f), 0.f));
+    }
     return l;
 }
 }

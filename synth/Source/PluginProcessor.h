@@ -34,7 +34,19 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // user wavetables (.wav, Serum format works): slot 0-3 -> tables "User 1-4"
+    bool loadWavetable (int slot, const void* data, size_t size, const juce::String& name, juce::String& error);
+    void clearWavetable (int slot);
+    juce::String wavetableName (int slot) const { return slot >= 0 && slot < ls::kCustom ? custName[slot] : juce::String(); }
+    const ls::Tables& tables() const { return synth.bank(); }
+
 private:
+    std::atomic<float>* lfoPtr[ls::kNumLfo][4] {};
+    std::atomic<float>* modPtr[ls::kNumMod][3] {};
+    juce::String custName[ls::kCustom];
+    std::vector<int16_t> custRaw[ls::kCustom];
+    void publishCustom (int slot, const std::vector<float>& frames, int nf, const juce::String& name);
+
     float get (const char* id) const;
     void readParams (ls::P& p) const;
     void handle (const juce::MidiMessage& m);
