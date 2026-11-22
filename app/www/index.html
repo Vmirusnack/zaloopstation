@@ -773,7 +773,7 @@ html.phone body{position:fixed;inset:0}
     <tr><td>Autotune</td><td>An insert plugin for one voice or one melody line at a time. It listens to the pitch, finds the nearest note of the chosen <b>Key</b> and <b>Scale</b> and pulls the sound there. <b>Retune speed</b>: 0 ms is the hard robotic effect, 40 to 100 ms is a natural correction, slower leaves more of the singing. <b>Amount</b> mixes how far to correct, <b>Flex</b> leaves notes that are already close, <b>Tuning</b> sets the reference pitch. The display shows the sung note, the note it is corrected to and the lit scale keys. It does not work on chords. Corrections of more than about a semitone sound processed.</td></tr>
     <tr><td>OTT</td><td>An insert plugin: a three-band upward and downward compressor (splits at 88 Hz and 2.5 kHz). It lifts quiet parts and pulls loud parts toward the middle in every band, which gives the dense, bright, "in your face" sound. <b>Depth</b> sets how hard, <b>Time</b> how slow, <b>Upward</b> and <b>Downward</b> set the two halves separately, <b>Low / Mid / High gain</b> shape the bands, <b>Mix</b> blends with the original (parallel). The bars show what each band is doing right now. Loud material is pulled down a lot, so raise <b>Output</b> to compensate. No delay.</td></tr>
     <tr><td>Moog Ladder</td><td>An insert plugin and a filter type in the Wavetable Synth (Moog ladder 24, Acid diode 18). Four saturating one-pole stages with feedback. Modes: LP 24, LP 18, LP 12, BP, HP 24. Env mod opens the cutoff with the input level, the LFO sweeps it. Mix blends with the dry signal.</td></tr>
-    <tr><td>MIDI files</td><td>File → Import MIDI file… (or drop a .mid on the window) makes one track per MIDI track or channel, channel 10 becomes a drum track, and the tempo is taken when the project is empty. File → Export MIDI file writes every note track to a .mid (480 ticks per beat). In the claude.ai page the file arrives inside a ZIP.</td></tr>
+    <tr><td>MIDI files</td><td>File → Import MIDI file… (or drop one or several .mid files on the window; the names BASS, CHORDS, PADS, LEADS pick a matching sound) makes one track per MIDI track or channel, channel 10 becomes a drum track, and the tempo is taken when the project is empty. File → Export MIDI file writes every note track to a .mid (480 ticks per beat). In the claude.ai page the file arrives inside a ZIP.</td></tr>
     <tr><td>My synth presets</td><td>In the Wavetable Synth the Save ▾ button stores the current sound as your own preset (shown under “My presets”), overwrites, renames or deletes it, and exports or imports all presets as a .json file. They live in this browser; export them to keep a backup or move them to another computer. Acid Synth tracks have the same under My presets ▾.</td></tr>
     <tr><td>Level meters</td><td>Stereo meters with peak hold, a peak number and a clip lamp on every mixer strip, the buses and the master, plus a wide one in the toolbar. Click a meter to reset its peak and clip, right-click to cycle the style. Styles: Tri-colour LED, Classic LED, LCD blue, LCD amber dots and Boombox 90s (the list next to Single in the mixer).</td></tr>
     <tr><td>Key Harmonizer</td><td>An insert effect for any track (synth, sample, loop), a bus or the master. It moves the partials of the sound onto the notes of the chosen Key and Scale, so a bright lead or a sampled loop stays rich but fits the key. Snap sets how strongly, Low cut leaves the bass and kick untouched, Mix blends with the original. The display shows the sound with the notes of the scale marked (the root in gold). Fast mode adds about 21 ms of delay and High about 43 ms; the other tracks are delayed to match, so everything stays in time (exports are shifted back). It works best on melodic parts; on a whole mix it can raise peaks. <b>Automation:</b> Key, Scale, Snap, Low cut, Mix and Output can be automated on a track (first Key Harmonizer insert). Press A for the automation view, choose “Key Harmonizer · …” in the list next to Auto, and click the lane to add points; Key and Scale step from point to point. Or set the track to Touch / Latch / Write and turn the knobs while the song plays. The knobs follow the curve.</td></tr>
@@ -806,7 +806,7 @@ html.phone body{position:fixed;inset:0}
   </table>
   <div class="btnrow" style="justify-content:space-between;margin-top:14px"><button class="mini danger" id="bReset">Reset to demo project</button><button class="tb" id="bHelpClose">Close</button></div>
 </div></div>
-<input type="file" id="midIn" accept=".mid,.midi,audio/midi" hidden>
+<input type="file" id="midIn" accept=".mid,.midi,audio/midi" multiple hidden>
 <input type="file" id="projIn" accept=".json,application/json" hidden>
 <input type="file" id="themeIn" accept=".json,application/json" hidden>
 <aside id="appear" hidden aria-label="Appearance"></aside>
@@ -1727,7 +1727,7 @@ function bindSlicer(){
   $('slMidi').onclick=createSliceRegion;
   window.addEventListener('dragover',e=>{if([...(e.dataTransfer&&e.dataTransfer.types||[])].includes('Files'))e.preventDefault()});
   window.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(!f)return;e.preventDefault();
-    if(/\.midi?$/i.test(f.name)){importMidiFile(f);return}
+    if(/\.midi?$/i.test(f.name)){importMidiFiles(e.dataTransfer.files);return}
     if(f.type.startsWith('audio/')||/\.(wav|mp3|ogg|flac|m4a|aac)$/i.test(f.name))loadSampleFile(f);else toast('Drop an audio file (wav, mp3, ogg, flac, m4a)')});
 }
 /* ============ Insert effects ============ */
@@ -7916,6 +7916,32 @@ Object.assign(TEMPLATES,{
     k.vol=.88;h.vol=.42;g.vol=.42;d.vol=.55;ri.vol=.5;
     hardMaster();S.cycleEnd=32}}
 });
+const RAW_MEL={"rawphoric":{"bass":[[54,0.0,4.0],[62,4.0,4.0],[59,8.0,4.0],[61,12.0,4.0],[54,16.0,4.0],[62,20.0,4.0],[59,24.0,4.0],[61,28.0,4.0]],"chords":[[49,0.0,0.5833],[54,0.0,0.5833],[57,0.0,0.5833],[49,0.75,0.0833],[54,0.75,0.0833],[57,0.75,0.0833],[49,1.0,0.3333],[54,1.0,0.3333],[57,1.0,0.3333],[49,1.5,0.3333],[54,1.5,0.3333],[57,1.5,0.3333],[49,2.0,0.8333],[54,2.0,0.8333],[57,2.0,0.8333],[49,3.0,0.3333],[54,3.0,0.3333],[57,3.0,0.3333],[49,3.5,0.3333],[54,3.5,0.3333],[57,3.5,0.3333],[54,4.0,0.8333],[57,4.0,0.8333],[62,4.0,0.8333],[54,5.0,0.8333],[57,5.0,0.8333],[62,5.0,0.8333],[54,6.0,0.8333],[57,6.0,0.8333],[62,6.0,0.8333],[54,7.0,0.8333],[57,7.0,0.8333],[62,7.0,0.8333],[50,8.0,0.5833],[54,8.0,0.5833],[59,8.0,0.5833],[50,8.75,0.0833],[54,8.75,0.0833],[59,8.75,0.0833],[50,9.0,0.3333],[54,9.0,0.3333],[59,9.0,0.3333],[50,9.5,0.3333],[54,9.5,0.3333],[59,9.5,0.3333],[50,10.0,0.8333],[54,10.0,0.8333],[59,10.0,0.8333],[50,11.0,0.3333],[54,11.0,0.3333],[59,11.0,0.3333],[50,11.5,0.3333],[54,11.5,0.3333],[59,11.5,0.3333],[49,12.0,0.8333],[53,12.0,0.8333],[56,12.0,0.8333],[49,13.0,0.8333],[53,13.0,0.8333],[56,13.0,0.8333],[49,14.0,0.8333],[53,14.0,0.8333],[56,14.0,0.8333],[49,15.0,0.8333],[53,15.0,0.8333],[56,15.0,0.8333],[49,16.0,0.5833],[54,16.0,0.5833],[57,16.0,0.5833],[49,16.75,0.0833],[54,16.75,0.0833],[57,16.75,0.0833],[49,17.0,0.3333],[54,17.0,0.3333],[57,17.0,0.3333],[49,17.5,0.3333],[54,17.5,0.3333],[57,17.5,0.3333],[49,18.0,0.8333],[54,18.0,0.8333],[57,18.0,0.8333],[49,19.0,0.3333],[54,19.0,0.3333],[57,19.0,0.3333],[49,19.5,0.3333],[54,19.5,0.3333],[57,19.5,0.3333],[54,20.0,0.8333],[57,20.0,0.8333],[62,20.0,0.8333],[54,21.0,0.8333],[57,21.0,0.8333],[62,21.0,0.8333],[54,22.0,0.8333],[57,22.0,0.8333],[62,22.0,0.8333],[54,23.0,0.8333],[57,23.0,0.8333],[62,23.0,0.8333],[50,24.0,0.5833],[54,24.0,0.5833],[59,24.0,0.5833],[50,24.75,0.0833],[54,24.75,0.0833],[59,24.75,0.0833],[50,25.0,0.3333],[54,25.0,0.3333],[59,25.0,0.3333],[50,25.5,0.3333],[54,25.5,0.3333],[59,25.5,0.3333],[50,26.0,0.8333],[54,26.0,0.8333],[59,26.0,0.8333],[50,27.0,0.3333],[54,27.0,0.3333],[59,27.0,0.3333],[50,27.5,0.3333],[54,27.5,0.3333],[59,27.5,0.3333],[49,28.0,0.8333],[53,28.0,0.8333],[56,28.0,0.8333],[49,29.0,0.8333],[53,29.0,0.8333],[56,29.0,0.8333],[49,30.0,0.8333],[53,30.0,0.8333],[56,30.0,0.8333],[49,31.0,0.8333],[53,31.0,0.8333],[56,31.0,0.8333]],"pads":[[61,0.0,4.0],[66,0.0,4.0],[69,0.0,4.0],[66,4.0,4.0],[69,4.0,4.0],[74,4.0,4.0],[62,8.0,4.0],[66,8.0,4.0],[71,8.0,4.0],[61,12.0,4.0],[65,12.0,4.0],[68,12.0,4.0],[61,16.0,4.0],[66,16.0,4.0],[69,16.0,4.0],[66,20.0,4.0],[69,20.0,4.0],[74,20.0,4.0],[62,24.0,4.0],[66,24.0,4.0],[71,24.0,4.0],[61,28.0,4.0],[65,28.0,4.0],[68,28.0,4.0]],"harm":[[49,0.0,0.5833],[49,0.75,0.0833],[49,1.0,0.3333],[52,1.5,0.3333],[54,2.0,0.8333],[54,3.0,0.3333],[56,3.5,0.3333],[54,4.0,0.0833],[57,4.0417,0.8333],[54,5.0,0.8333],[59,6.0,0.0833],[62,6.0417,0.8333],[64,7.0,0.8333],[66,8.0,0.5833],[66,8.75,0.0833],[66,9.0,0.3333],[64,9.5,0.3333],[62,10.0,0.8333],[62,11.0,0.3333],[64,11.5,0.3333],[58,12.0,0.0833],[61,12.0417,0.8333],[57,13.0,0.8333],[53,14.0,0.0833],[56,14.0417,0.8333],[53,15.0,0.8333],[49,16.0,0.5833],[49,16.75,0.0833],[49,17.0,0.3333],[52,17.5,0.3333],[54,18.0,0.8333],[54,19.0,0.3333],[56,19.5,0.3333],[54,20.0,0.0833],[57,20.0417,0.8333],[52,21.0,0.8333],[59,22.0,0.0833],[62,22.0417,0.8333],[64,23.0,0.8333],[66,24.0,0.5833],[66,24.75,0.0833],[66,25.0,0.3333],[64,25.5,0.3333],[66,26.0,0.8333],[66,27.0,0.3333],[68,27.5,0.3333],[62,28.0,0.0833],[65,28.0417,0.8333],[56,29.0,0.8333],[63,30.0,0.0833],[66,30.0417,0.8333],[65,31.0,0.8333]],"lead":[[54,0.0,0.5833],[54,0.75,0.0833],[54,1.0,0.3333],[56,1.5,0.3333],[57,2.0,0.8333],[57,3.0,0.3333],[61,3.5,0.3333],[59,4.0,0.0833],[62,4.0417,0.8333],[57,5.0,0.8333],[63,6.0,0.0833],[66,6.0417,0.8333],[68,7.0,0.8333],[69,8.0,0.5833],[69,8.75,0.0833],[69,9.0,0.3333],[68,9.5,0.3333],[66,10.0,0.8333],[66,11.0,0.3333],[68,11.5,0.3333],[62,12.0,0.0833],[65,12.0417,0.8333],[61,13.0,0.8333],[56,14.0,0.0833],[59,14.0417,0.8333],[57,15.0,0.8333],[54,16.0,0.5833],[54,16.75,0.0833],[54,17.0,0.3333],[56,17.5,0.3333],[57,18.0,0.8333],[57,19.0,0.3333],[61,19.5,0.3333],[59,20.0,0.0833],[62,20.0417,0.8333],[57,21.0,0.8333],[63,22.0,0.0833],[66,22.0417,0.8333],[68,23.0,0.8333],[69,24.0,0.5833],[69,24.75,0.0833],[69,25.0,0.3333],[68,25.5,0.3333],[69,26.0,0.8333],[69,27.0,0.3333],[71,27.5,0.3333],[65,28.0,0.0833],[68,28.0417,0.8333],[61,29.0,0.8333],[66,30.0,0.0833],[69,30.0417,0.8333],[68,31.0,0.8333]]},"rawstyle":{"chords":[[62,1.0,0.8021],[67,1.0,0.8021],[71,1.0,0.8021],[62,2.0,0.8021],[67,2.0,0.8021],[71,2.0,0.8021],[62,3.0,0.8021],[67,3.0,0.8021],[71,3.0,0.8021],[62,4.0,0.8021],[67,4.0,0.8021],[71,4.0,0.8021],[62,5.0,0.3021],[67,5.0,0.3021],[71,5.0,0.3021],[62,5.5,0.3021],[67,5.5,0.3021],[71,5.5,0.3021],[62,6.0,0.8021],[67,6.0,0.8021],[71,6.0,0.8021],[62,7.0,0.8021],[67,7.0,0.8021],[71,7.0,0.8021],[63,8.0,0.8021],[68,8.0,0.8021],[72,8.0,0.8021],[63,9.0,0.3021],[68,9.0,0.3021],[72,9.0,0.3021],[63,9.5,0.3021],[68,9.5,0.3021],[72,9.5,0.3021],[63,10.0,0.8021],[68,10.0,0.8021],[72,10.0,0.8021],[63,11.0,0.8021],[68,11.0,0.8021],[72,11.0,0.8021],[62,12.0,3.8021],[67,12.0,3.8021],[71,12.0,3.8021],[62,17.0,0.8021],[67,17.0,0.8021],[71,17.0,0.8021],[62,18.0,0.8021],[67,18.0,0.8021],[71,18.0,0.8021],[62,19.0,0.8021],[67,19.0,0.8021],[71,19.0,0.8021],[62,20.0,0.8021],[67,20.0,0.8021],[71,20.0,0.8021],[62,21.0,0.3021],[67,21.0,0.3021],[71,21.0,0.3021],[62,21.5,0.3021],[67,21.5,0.3021],[71,21.5,0.3021],[62,22.0,0.8021],[67,22.0,0.8021],[71,22.0,0.8021],[62,23.0,0.8021],[67,23.0,0.8021],[71,23.0,0.8021],[63,24.0,1.3021],[68,24.0,1.3021],[72,24.0,1.3021],[63,25.5,0.3021],[68,25.5,0.3021],[72,25.5,0.3021],[67,26.0,0.8021],[72,26.0,0.8021],[75,26.0,0.8021],[67,27.0,0.8021],[72,27.0,0.8021],[75,27.0,0.8021],[62,28.0,3.8021],[67,28.0,3.8021],[71,28.0,3.8021]],"pads":[[62,0.0,8.0],[67,0.0,8.0],[71,0.0,8.0],[63,8.0,4.0],[68,8.0,4.0],[72,8.0,4.0],[62,12.0,4.0],[67,12.0,4.0],[71,12.0,4.0],[62,16.0,8.0],[67,16.0,8.0],[71,16.0,8.0],[63,24.0,2.0],[68,24.0,2.0],[72,24.0,2.0],[67,26.0,2.0],[72,26.0,2.0],[75,26.0,2.0],[62,28.0,4.0],[67,28.0,4.0],[71,28.0,4.0]],"harm":[[50,1.0,0.8021],[55,2.0,0.8021],[56,3.0,0.8021],[59,4.0,0.8021],[59,5.0,0.3021],[60,5.5,0.3021],[59,6.0,0.8021],[56,7.0,0.8021],[55,8.0,0.8021],[55,9.0,0.3021],[56,9.5,0.3021],[55,10.0,0.8021],[51,11.0,0.8021],[50,12.0,3.8021],[50,17.0,0.8021],[55,18.0,0.8021],[56,19.0,0.8021],[59,20.0,0.8021],[59,21.0,0.3021],[60,21.5,0.3021],[59,22.0,0.8021],[60,23.0,0.8021],[62,24.0,1.3021],[60,25.5,0.3021],[59,26.0,0.8021],[56,27.0,0.8021],[55,28.0,3.8021]],"bass":[[55,0.0,8.0],[56,8.0,4.0],[55,12.0,4.0],[55,16.0,8.0],[56,24.0,2.0],[60,26.0,2.0],[55,28.0,4.0]],"lead":[[55,1.0,0.8021],[59,2.0,0.8021],[60,3.0,0.8021],[62,4.0,0.8021],[62,5.0,0.3021],[63,5.5,0.3021],[62,6.0,0.8021],[60,7.0,0.8021],[59,8.0,0.8021],[59,9.0,0.3021],[60,9.5,0.3021],[59,10.0,0.8021],[56,11.0,0.8021],[55,12.0,3.8021],[55,17.0,0.8021],[59,18.0,0.8021],[60,19.0,0.8021],[62,20.0,0.8021],[62,21.0,0.3021],[63,21.5,0.3021],[62,22.0,0.8021],[63,23.0,0.8021],[65,24.0,1.3021],[63,25.5,0.3021],[62,26.0,0.8021],[60,27.0,0.8021],[59,28.0,3.8021]]},"rawstyle11":{"lead":[[56,0.0,0.8333],[56,1.0,0.8333],[63,2.0,0.8333],[63,3.0,0.8333],[61,4.5,0.3333],[64,5.0,0.8333],[61,5.5,0.3333],[63,6.0,1.5833],[56,8.0,0.8333],[56,9.0,0.8333],[63,10.0,0.8333],[63,11.0,0.8333],[61,12.5,0.3333],[64,13.0,0.8333],[61,13.5,0.3333],[63,14.0,0.3333],[61,14.5,0.3333],[59,15.0,0.3333],[58,15.5,0.3333],[56,16.0,0.8333],[56,17.0,0.8333],[63,18.0,0.8333],[63,19.0,0.8333],[61,20.5,0.3333],[64,21.0,0.8333],[61,21.5,0.3333],[63,22.0,1.5833],[56,24.0,0.8333],[56,25.0,0.8333],[63,26.0,0.8333],[63,27.0,0.8333],[55,28.5,0.3333],[61,29.0,0.8333],[59,29.5,0.3333],[58,30.0,0.3333],[59,30.5,0.3333],[58,31.0,0.3333],[55,31.5,0.3333]],"pads":[[63,0.0,8.0],[68,0.0,8.0],[71,0.0,8.0],[59,8.0,8.0],[64,8.0,8.0],[68,8.0,8.0],[68,16.0,8.0],[73,16.0,8.0],[76,16.0,8.0],[66,24.0,4.0],[71,24.0,4.0],[75,24.0,4.0],[65,28.0,2.0],[70,28.0,2.0],[73,28.0,2.0],[62,30.0,2.0],[67,30.0,2.0],[70,30.0,2.0]],"chords":[[51,0.0,0.8333],[56,0.0,0.8333],[59,0.0,0.8333],[51,1.0,0.8333],[56,1.0,0.8333],[59,1.0,0.8333],[51,2.0,0.8333],[56,2.0,0.8333],[59,2.0,0.8333],[51,3.0,0.8333],[56,3.0,0.8333],[59,3.0,0.8333],[51,4.5,0.3333],[56,4.5,0.3333],[59,4.5,0.3333],[51,5.0,0.5],[56,5.0,0.5],[59,5.0,0.5],[51,5.5,0.3333],[56,5.5,0.3333],[59,5.5,0.3333],[51,6.0,1.5833],[56,6.0,1.5833],[59,6.0,1.5833],[52,8.0,0.8333],[56,8.0,0.8333],[59,8.0,0.8333],[52,9.0,0.8333],[56,9.0,0.8333],[59,9.0,0.8333],[52,10.0,0.8333],[56,10.0,0.8333],[59,10.0,0.8333],[52,11.0,0.8333],[56,11.0,0.8333],[59,11.0,0.8333],[52,12.5,0.3333],[56,12.5,0.3333],[59,12.5,0.3333],[52,13.0,0.5],[56,13.0,0.5],[59,13.0,0.5],[52,13.5,0.3333],[56,13.5,0.3333],[59,13.5,0.3333],[52,14.0,0.3333],[56,14.0,0.3333],[59,14.0,0.3333],[52,14.5,0.3333],[56,14.5,0.3333],[59,14.5,0.3333],[52,15.0,0.3333],[56,15.0,0.3333],[59,15.0,0.3333],[52,15.5,0.3333],[56,15.5,0.3333],[59,15.5,0.3333],[56,16.0,0.8333],[61,16.0,0.8333],[64,16.0,0.8333],[56,17.0,0.8333],[61,17.0,0.8333],[64,17.0,0.8333],[56,18.0,0.8333],[61,18.0,0.8333],[64,18.0,0.8333],[56,19.0,0.8333],[61,19.0,0.8333],[64,19.0,0.8333],[56,20.5,0.3333],[61,20.5,0.3333],[64,20.5,0.3333],[56,21.0,0.5],[61,21.0,0.5],[64,21.0,0.5],[56,21.5,0.3333],[61,21.5,0.3333],[64,21.5,0.3333],[56,22.0,1.5833],[61,22.0,1.5833],[64,22.0,1.5833],[54,24.0,0.8333],[59,24.0,0.8333],[63,24.0,0.8333],[54,25.0,0.8333],[59,25.0,0.8333],[63,25.0,0.8333],[54,26.0,0.8333],[59,26.0,0.8333],[63,26.0,0.8333],[54,27.0,0.8333],[59,27.0,0.8333],[63,27.0,0.8333],[53,28.5,0.3333],[58,28.5,0.3333],[61,28.5,0.3333],[53,29.0,0.5],[58,29.0,0.5],[61,29.0,0.5],[53,29.5,0.3333],[58,29.5,0.3333],[61,29.5,0.3333],[50,30.0,0.3333],[55,30.0,0.3333],[58,30.0,0.3333],[50,30.5,0.3333],[55,30.5,0.3333],[58,30.5,0.3333],[50,31.0,0.3333],[55,31.0,0.3333],[58,31.0,0.3333],[50,31.5,0.3333],[55,31.5,0.3333],[58,31.5,0.3333]],"bass":[[56,0.0,8.0],[52,8.0,8.0],[61,16.0,8.0],[59,24.0,4.0],[58,28.0,2.0],[55,30.0,2.0]]}};
+function rawMelTemplate(pk,name,desc,cols,kickNote,vel){
+  return {grp:'hard',name,desc,bpm:160,cols,build(){
+    const D=RAW_MEL[pk],k=kickTrack('Kick','rawstyle');Object.assign(k.kk,{punch:320,sweep:50,len:190,click:.5,tail:.45,tlen:280,drive:.7,clip:.5,mode:'hard'});
+    const rm=hardTrack('Rumble','rumble'),bs=hardTrack('Bass','reese'),ch=hardTrack('Chords','euphoric'),hm=D.harm?hardTrack('Harmonies','euphoric'):null,ld=hardTrack('Lead','screech'),pd=newTrack('pad','Pads'),d=newTrack('drums','Drums'),ri=sfxTrack('Riser','riser');
+    S.tracks.push(...[k,rm,bs,ch,hm,ld,pd,d,ri].filter(Boolean));
+    const V=(a,v)=>D[a].map(n=>[n[0],n[1],n[2],v]),rootAt=b=>{const n=D.bass.find(x=>x[1]<=b*4+.01&&x[1]+x[2]>b*4+.01)||D.bass[0];return n[0]-12};
+    nreg(k,0,32,'Kick',repBars(8,()=>[0,1,2,3].map(i=>[kickNote,i,.5,124])));
+    nreg(rm,0,32,'Rumble',repBars(8,bar=>[0,1,2,3].map(i=>[rootAt(bar),i+.5,.4,100])));
+    nreg(bs,0,32,'Bass',V('bass',vel[0]));
+    nreg(ch,0,32,'Chords',V('chords',vel[1]));
+    if(hm)nreg(hm,0,32,'Harmonies',V('harm',vel[2]));
+    nreg(ld,0,32,'Lead',V('lead',vel[3]));
+    nreg(pd,0,32,'Pads',V('pads',vel[4]));
+    hardDrums(d,8,{hat:'16',roll:true});
+    nreg(ri,0,32,'Riser',[[kickNote+12,28,4,100]]);
+    duck(rm,k,{thr:-36,ratio:6,rel:70});duck(bs,k,{thr:-32,ratio:5,rel:80});duck(ch,k,{thr:-30,ratio:3,rel:70});if(hm)duck(hm,k,{thr:-30,ratio:3,rel:70});duck(pd,k,{thr:-34,ratio:6,rel:140});
+    addFx(ch,'reverb',{mix:.14,size:1.4});if(hm)addFx(hm,'reverb',{mix:.18,size:1.6});addFx(ld,'reverb',{mix:.12,size:1.3});addFx(pd,'reverb',{mix:.3,size:2.4});
+    k.vol=.9;rm.vol=.5;bs.vol=.42;ch.vol=.36;if(hm)hm.vol=.3;ld.vol=.4;pd.vol=.26;d.vol=.5;ri.vol=.45;
+    hardMaster();S.cycleEnd=32}};
+}
+Object.assign(TEMPLATES,{
+  rawphoric:rawMelTemplate('rawphoric','Rawphoric','OPS Rawphoric melody 03 in F# minor: bass, chords, harmonies, lead and pads over a raw kick and rumble. 160 BPM',[5,2,0,4],54,[105,92,84,100,72]),
+  rawstylemel:rawMelTemplate('rawstyle','Rawstyle Melody 03','OPS Rawstyle melody 03 around G (G, Ab, B): bass, chords, harmonies, lead and pads over a raw kick and rumble. 160 BPM',[2,0,5,3],55,[105,92,84,100,80]),
+  rawstylemel11:rawMelTemplate('rawstyle11','Rawstyle Melody 11','OPS Rawstyle melody 11 in G# minor: bass, chords, lead and pads over a raw kick and rumble. 160 BPM',[4,1,5,0],56,[105,92,84,100,80])
+});
 /* ============ Logic Pro style key commands for a Windows keyboard (Cmd = Ctrl, Option = Alt) ============ */
 function duplicateTrack(t){
   if(!t)return toast('Select a track first');
@@ -8056,7 +8082,7 @@ function parseMidi(ab){
   }
   return out;
 }
-async function importMidiFile(file){
+async function importMidiFile(file,label){
   let m;
   try{m=parseMidi(await file.arrayBuffer())}catch(e){return toast('Could not read this MIDI file: '+e.message)}
   if(!m.tracks.length)return toast('This MIDI file has no notes');
@@ -8064,18 +8090,43 @@ async function importMidiFile(file){
   const empty=!S.tracks.some(t=>t.regions.some(r=>(r.notes&&r.notes.length)||r.clip));
   let setBpm='';
   if(empty&&m.bpm){setTempo(m.bpm);setBpm=' · tempo '+S.bpm}
-  const base=file.name.replace(/\.[^.]+$/,'').slice(0,24);let added=0;
+  const base=(label||file.name.replace(/\.[^.]+$/,'')).slice(0,28);let added=0,endBeat=0;
   m.tracks.slice(0,32).forEach((mt,i)=>{
     const drums=mt.notes.filter(n=>n.ch===9).length>mt.notes.length/2;
-    const t=newTrack(drums?'drums':'synth',mt.name||(m.tracks.length>1?base+' '+(i+1):base));
+    const nm=(label&&m.tracks.length===1)?label.slice(0,28):(mt.name||(m.tracks.length>1?base+' '+(i+1):base));
+    const t=drums?newTrack('drums',nm):midiInstrument(nm,label||'');
     let lo=1e9,hi=0;mt.notes.forEach(n=>{lo=Math.min(lo,n.t);hi=Math.max(hi,n.t+n.l)});
     const start=Math.floor(lo/4+1e-6)*4,len=Math.max(4,Math.ceil(hi/4-1e-6)*4-start);
     const r=newRegion(start,len,t.name);
     r.notes=mt.notes.map(n=>({p:drums?(GM_DRUM_MAP[n.p]||n.p):n.p,s:+(n.t-start).toFixed(4),l:+Math.max(.05,n.l).toFixed(4),v:n.v})).sort((a,b)=>a.s-b.s);
-    t.regions.push(r);S.tracks.push(t);if(ac){buildChain(t);}added++;
+    t.regions.push(r);S.tracks.push(t);if(ac){buildChain(t);}added++;endBeat=Math.max(endBeat,start+len);
   });
+  if(empty&&endBeat){S.cycleStart=0;S.cycleEnd=Math.min(endBeat,128);placeCycle()}
   if(ac)applyMix();renderAll();changed();
   toast('Imported '+added+' track'+(added>1?'s':'')+' from '+file.name+setBpm);
+}
+/* the sound for an imported track follows its name: bass, pad, chords, keys, or a lead */
+function midiInstrument(name,extra){
+  const w=(name+' '+extra).toLowerCase();
+  if(/bass|sub\b|808|reese/.test(w))return newTrack('bass',name);
+  if(/pad|string|atmos|ambien/.test(w))return newTrack('pad',name);
+  if(/piano|keys|rhodes|organ/.test(w))return newTrack('keys',name);
+  if(/chord|stab|harmon|lead|melod|screech|hoover|arp|pluck/.test(w))return hardTrack(name,/lead|melod|screech|hoover/.test(w)?'screech':'euphoric');
+  return newTrack('synth',name);
+}
+/* several .mid files at once: the part of the name they share is dropped, so BASS, CHORDS, PADS stay */
+async function importMidiFiles(files){
+  files=[...files].filter(f=>/\.midi?$/i.test(f.name));if(!files.length)return;
+  const toks=files.map(f=>f.name.replace(/\.[^.]+$/,'').replace(/^[0-9a-f]{8}-/i,'').split(/[_\s]+/).filter(Boolean));
+  const same=i=>toks.every(t=>t.length>1&&t[i]===toks[0][i]);
+  const lab=toks.map(t=>{
+    if(files.length<2||t.length<2)return t.join(' ');
+    const role=t[t.length-1],packs=new Set(toks.map(x=>x.slice(0,-1).join(' ')));
+    if(packs.size<2)return role;
+    const head=t.slice(0,-1).filter((w,i)=>!(toks.every(x=>x.length===t.length&&x[i]===w)));
+    return head.join(' ')+' '+role;
+  });
+  for(let i=0;i<files.length;i++)await importMidiFile(files[i],files.length>1?lab[i]:undefined);
 }
 /* ============ Stereo level meters with several visual skins ============ */
 const MT_MIN=-48,MT_MAX=3,MT_FALL=30;
@@ -8216,7 +8267,7 @@ function bind(){
   $('addTrack').onclick=e=>showMenu(e.currentTarget,Object.entries(TYPES).map(([k,v])=>[v,()=>addTrack(k)]));
   $('bFile').onclick=e=>showMenu(e.currentTarget,[['Start page / new project…',showWelcome],['Appearance and themes…',toggleAppear],['Open project…',()=>$('projIn').click()],['Save project',saveProject],['Bounce project to WAV',()=>bounce('project')],['Bounce cycle range to WAV',()=>bounce('cycle')],['Add marker at playhead',()=>addMarker(snapB(headPos(),1))],['Import audio file…',()=>pickAudio(selTrackObj())],['Import MIDI file (.mid)…',()=>$('midIn').click()],['Export MIDI file (.mid)',exportMidi],['Export stems (ZIP of WAV files)',exportStems]]);
   $('audIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importAudio(f,audTarget);audTarget=null});
-  $('midIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importMidiFile(f)});
+  $('midIn').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)importMidiFiles(fs)});
   $('projIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)openProjectFile(f)});
   $('bAuto').onclick=toggleAutoView;$('autoParam').onchange=e=>{S.autoParam=e.target.value;drawAutoAll()};
   $('bAddBus').onclick=addBus;$('bMidi').onclick=()=>initMidi(true);$('bHelp').onclick=()=>{$('help').hidden=false};$('bHelpClose').onclick=()=>{$('help').hidden=true};
