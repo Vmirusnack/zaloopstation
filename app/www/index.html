@@ -766,7 +766,7 @@ html.phone body{position:fixed;inset:0}
     <tr><td>Mixer inserts</td><td>Every strip (tracks, buses and master) has insert slots above the pan knob. Click a slot to open the plugin in its own window, click the dot to bypass, right-click to move or remove, and use the dashed slot to add one</td></tr>
     <tr><td>Kick Designer</td><td>Instrument for the kick. Punch and Sweep shape the click and pitch drop, Body and Tail set the length, Drive and Clip distort it. The tail is tuned to the note you play, so move the notes for a melodic kick (frenchcore). Pick a style under Preset. Source → Sample pack plays the 18 built-in Zaag kicks (tuned to F, G, E, B or A); other notes pitch the sample, and Length, Drive and Clip still apply.</td></tr>
     <tr><td>Hard Synth</td><td>Unison saws with detune and width, FM, resonant filter with its own envelope, pitch dive, vibrato and heavy distortion. Presets: Screech, Hoover, Euphoric lead, Reverse bass, Raw bass, Uptempo stab, Frenchcore lead, Gabber stab.</td></tr>
-    <tr><td>Wavetable Synth</td><td>Serum-style synth (inspired by it, not a copy). Two wavetable oscillators (built-in tables or your own .wav, 2048 samples per frame) with a morph Position, Warp (bend, sync, squeeze, mirror, FM, quantize) and up to 16 unison voices. Sub, noise, resonant filter, three envelopes (Env 1 is the amplitude), three LFOs and an 8-slot modulation matrix. Open it with <b>Open synth…</b> in the inspector; drag over a wave picture to move the position. <b>Kick:</b> choose a Kick preset, or use Env 2 → Pitch (all) at +70 to +90 % with a short decay, a sine or Wavefold table as the body, Voices = 1 and the Drive / Clip distortion.</td></tr>
+    <tr><td>Wavetable Synth</td><td>Serum-style synth (inspired by it, not a copy). Two wavetable oscillators (built-in tables or your own .wav — Serum-format tables work, pick several files at once to fill a Library kept on this device; 📚 in the table list) with a morph Position, Warp (bend, sync, squeeze, mirror, FM, quantize) and up to 16 unison voices. Sub, noise, resonant filter, three envelopes (Env 1 is the amplitude), three LFOs and an 8-slot modulation matrix. Open it with <b>Open synth…</b> in the inspector; drag over a wave picture to move the position. <b>Kick:</b> choose a Kick preset, or use Env 2 → Pitch (all) at +70 to +90 % with a short decay, a sine or Wavefold table as the body, Voices = 1 and the Drive / Clip distortion.</td></tr>
     <tr><td>Rumble bus</td><td>In a track's inspector, under Sends, press <b>Rumble bus from this track</b> (use it on the kick). It creates a bus with a 100% wet reverb, a low-pass, saturation, a high-pass and a compressor keyed by that track, so the rumble swells between kicks. Tune it in the bus inserts: Reverb size sets the length, the low-pass cutoff sets the pitch range. The <b>Rumble Techno</b> template starts with this set up. For a single-plugin version, add the <b>Rumble</b> insert to the kick: the kick stays as it is and the rumble is added next to it, with Amount, Decay, Tune (pitch of the rumble), Low-pass, Drive and a built-in duck keyed by the kick.</td></tr>
     <tr><td>Acid Synth</td><td>Add a track with the instrument <b>Acid Synth (303)</b>: a mono bass line synth with a diode-ladder filter. Knobs: Tuning, Cutoff, Resonance, Env mod, Decay, Accent, Slide time, Distortion, Level. <b>Slide:</b> let a note run past the start of the next one and it glides into it. <b>Accent:</b> notes with velocity above about 108 are louder and open the filter harder. Pick a preset (Acid 303, square, squelch, dirty, overdriven) or press Open synth for the full engine. The <b>Acid Rave</b> template starts with a line like this.</td></tr>
     <tr><td>Vocal recording</td><td>Add an <b>Audio Track</b>. In its inspector press <b>Enable microphone</b> (the browser asks once), choose the input, and watch the Level bar move. Then arm the track with <b>R</b>, press <b>Record</b> and <b>Play</b>: everything you sing is captured as raw sound and placed as a region where you started, moved earlier by the sound-card delay. Press Stop to finish the take. If takes sound late or early, change <b>Shift (ms)</b>. <b>Monitor</b> lets you hear yourself through the track (only with headphones, otherwise it howls). Record without effects and add Autotune afterwards.</td></tr>
@@ -5288,14 +5288,72 @@ function wtTableOf(t,o){
   return wtBuilt(WT_BUILT[id]?id:'basic');
 }
 function wtTableName(t,id){const w=WTP(t);if(id&&id[0]==='c'&&w.cust&&w.cust[+id.slice(1)])return w.cust[+id.slice(1)].name;return (WT_BUILT[id]||{name:id}).name}
-function wtImportBuffer(float,name){ // float: mono Float32Array -> {name,fr,b64}
+function wtImportBuffer(float,name,fsz){ // float: mono Float32Array (fsz = samples per frame, default 2048) -> {name,fr,b64}
   let L=float.length;if(L<64)return null;
+  const FS=fsz>=64?fsz:WT_N,MAXF=256;
   let fr,data;
-  if(L>=3072){fr=Math.min(64,Math.floor(L/WT_N));data=float.subarray(0,fr*WT_N)}
+  if(L>=Math.max(3072,FS*1.5)||(fsz&&L>=FS*2)){
+    const nf=Math.floor(L/FS),pick=nf>MAXF?MAXF:nf;fr=pick;data=new Float32Array(fr*WT_N);
+    for(let f=0;f<fr;f++){
+      const src=nf>MAXF?Math.round(f*(nf-1)/(MAXF-1)):f,o=src*FS;
+      if(FS===WT_N){for(let i=0;i<WT_N;i++)data[f*WT_N+i]=float[o+i]}
+      else{for(let i=0;i<WT_N;i++){const x=i/WT_N*FS,k=Math.floor(x),fr2=x-k;data[f*WT_N+i]=float[o+k]*(1-fr2)+float[o+Math.min(FS-1,k+1)]*fr2}}
+    }
+  }
   else{fr=1;data=new Float32Array(WT_N);for(let i=0;i<WT_N;i++){const x=i/WT_N*L,j=Math.floor(x),f=x-j;data[i]=float[j]*(1-f)+float[Math.min(L-1,j+1)]*f}}
-  const d=new Float32Array(data);let pk=1e-9,mean=0;for(let i=0;i<d.length;i++)mean+=d[i];mean/=d.length;
+  const d=data;let pk=1e-9,mean=0;for(let i=0;i<d.length;i++)mean+=d[i];mean/=d.length;
   for(let i=0;i<d.length;i++){d[i]-=mean;pk=Math.max(pk,Math.abs(d[i]))}for(let i=0;i<d.length;i++)d[i]=d[i]/pk*.95;
-  return {name:(name||'Imported').replace(/\.[a-z0-9]+$/i,'').slice(0,24),fr,b64:wtF32ToB64(d)};
+  let nm=(name||'Imported').replace(/\.[a-z0-9]+$/i,'').replace(/^[0-9a-f]{20,}[-_]/i,'').trim();if(/^\d+$/.test(nm))nm='WT '+nm;
+  return {name:nm.slice(0,24),fr,b64:wtF32ToB64(d)};
+}
+/* own RIFF/WAV reader: PCM 8/16/24/32, float 32/64, any channel count (mixed to mono), Serum "clm " frame size */
+function wtParseWav(ab){
+  const dv=new DataView(ab);if(ab.byteLength<44||dv.getUint32(0)!==0x52494646||dv.getUint32(8)!==0x57415645)return null;
+  let pos=12,fmt=null,dat=null,fsz=0;
+  while(pos+8<=ab.byteLength){
+    const id=dv.getUint32(pos),sz=dv.getUint32(pos+4,true),b=pos+8;
+    if(id===0x666d7420)fmt={tag:dv.getUint16(b,true),ch:dv.getUint16(b+2,true),sr:dv.getUint32(b+4,true),bits:dv.getUint16(b+14,true),ext:sz>=26?dv.getUint16(b+24,true):0};
+    else if(id===0x64617461)dat={o:b,n:Math.min(sz,ab.byteLength-b)};
+    else if(id===0x636c6d20){let t='';for(let i=0;i<Math.min(sz,40);i++)t+=String.fromCharCode(dv.getUint8(b+i));const m=/<!>\s*(\d+)/.exec(t);if(m)fsz=+m[1]}
+    pos=b+sz+(sz&1);
+  }
+  if(!fmt||!dat||!fmt.ch)return null;
+  const tag=fmt.tag===0xFFFE?fmt.ext:fmt.tag,bps=fmt.bits>>3,fl=tag===3;
+  if(!(tag===1||tag===3)||!bps)return null;
+  const n=Math.floor(dat.n/(bps*fmt.ch)),out=new Float32Array(n);
+  for(let i=0;i<n;i++){let a=0;for(let c=0;c<fmt.ch;c++){const o=dat.o+(i*fmt.ch+c)*bps;let v;
+    if(fl)v=bps===8?dv.getFloat64(o,true):dv.getFloat32(o,true);
+    else if(bps===2)v=dv.getInt16(o,true)/32768;
+    else if(bps===3){let x=dv.getUint8(o)|dv.getUint8(o+1)<<8|dv.getUint8(o+2)<<16;if(x&0x800000)x-=0x1000000;v=x/8388608}
+    else if(bps===4)v=dv.getInt32(o,true)/2147483648;
+    else v=(dv.getUint8(o)-128)/128;
+    a+=v}out[i]=a/fmt.ch}
+  return {data:out,fsz,sr:fmt.sr};
+}
+async function wtReadFile(f){ // -> {tb} or null
+  const buf=await f.arrayBuffer();let mono,fsz=0;
+  const w=wtParseWav(buf);
+  if(w){mono=w.data;fsz=w.fsz}
+  else{
+    const dc=new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,1,44100),ab=await dc.decodeAudioData(buf);
+    mono=new Float32Array(ab.length);for(let c=0;c<ab.numberOfChannels;c++){const d=ab.getChannelData(c);for(let i=0;i<d.length;i++)mono[i]+=d[i]/ab.numberOfChannels}
+  }
+  return wtImportBuffer(mono,f.name,fsz);
+}
+/* persistent wavetable library (IndexedDB, this device only) */
+let WT_LIB=[];
+async function wtLibLoad(){try{const v=await idbGet('wtlib');if(Array.isArray(v))WT_LIB=v.filter(x=>x&&x.b64&&x.fr)}catch(e){}}
+async function wtLibSave(){try{await idbPut('wtlib',WT_LIB)}catch(e){console.warn(e)}}
+wtLibLoad();
+function wtUseLib(t,k,li){ // copy a library table into the project and put it on oscillator k
+  const w=WTP(t),tb=WT_LIB[li];if(!tb)return;w.cust=w.cust||[];
+  let idx=w.cust.findIndex(c=>c.b64===tb.b64);
+  if(idx<0){
+    if(w.cust.length<8)idx=w.cust.length;
+    else{idx=w.cust.findIndex((c,i)=>w.a.tbl!=='c'+i&&w.b.tbl!=='c'+i);if(idx<0)idx=0}
+    w.cust[idx]={name:tb.name,fr:tb.fr,b64:tb.b64};
+  }
+  w[k].tbl='c'+idx;wtPushTab(t,k);
 }
 
 /* ---------------- parameters ---------------- */
@@ -5618,10 +5676,11 @@ function renderWt(){
   pre.onchange=e=>{const v=e.target.value;if(!v)return;pushUndo();if(v.startsWith('u:'))wtuApply(t,v.slice(2));else wtApplyPreset(t,v);changed();renderWt();auditionTrack(t,wtAuditionNote(t),1.2)};
   const mine=document.createElement('button');mine.className='mini';mine.textContent='Save ▾';mine.title='Save the sound as your own preset, rename or delete it, export or import presets';mine.onclick=e=>wtuMenu(e.currentTarget,t,()=>renderWt());
   const aud=document.createElement('button');aud.className='mini';aud.textContent='▶ Play';aud.onclick=()=>auditionTrack(t,wtAuditionNote(t),1.2);
-  const imp=document.createElement('button');imp.className='mini';imp.textContent='Import wavetable…';imp.title='Load a .wav: every 2048 samples become one frame (up to 64). A short single cycle becomes one frame.';
+  const imp=document.createElement('button');imp.className='mini';imp.textContent='Import wavetable…';imp.title='Load one or many .wav wavetables (Serum format works: 2048 samples per frame, up to 256 frames). Several files go into your library on this device; pick them in the oscillator table list. A short single cycle becomes one frame.';
   imp.onclick=()=>wtImportDialog(t);
   const x=document.createElement('button');x.className='mini';x.textContent='✕';x.setAttribute('aria-label','Close');x.onclick=closeWt;
-  head.append(pre,mine,aud,imp,x);
+  const lib=document.createElement('button');lib.className='mini';lib.textContent='Library ✕';lib.title='Remove all imported wavetables from the library on this device';lib.onclick=()=>wtLibClear(t);
+  head.append(pre,mine,aud,imp,lib,x);
   head.onpointerdown=e=>{
     if(e.target.closest('button,select'))return;const r=el.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;
     const mv=ev=>{el.style.left=clamp(ev.clientX-dx,0,window.innerWidth-120)+'px';el.style.top=clamp(ev.clientY-dy,0,window.innerHeight-60)+'px';el.style.transform='none'};
@@ -5644,8 +5703,8 @@ function renderWt(){
     const o=w[k],sec=wtSec(row1,'Oscillator '+k.toUpperCase());
     const on=document.createElement('button');on.className='mini pw'+(o.on?' on':'');on.textContent='⏻';on.title='Oscillator on/off';
     on.onclick=()=>{pushUndo();o.on=o.on?0:1;on.classList.toggle('on',!!o.on);wtPush(t);changed()};sec.firstChild.insertBefore(on,sec.firstChild.firstChild.nextSibling);
-    const tbls=[...Object.entries(WT_BUILT).map(([id,v])=>[id,v.name]),...(w.cust||[]).map((c,i)=>['c'+i,'★ '+c.name])];
-    wtSelect(sec.firstChild,'',tbls,o.tbl,v=>{o.tbl=v;wtPushTab(t,k);wtRedraw()},'wtbl');
+    const tbls=[...Object.entries(WT_BUILT).map(([id,v])=>[id,v.name]),...(w.cust||[]).map((c,i)=>['c'+i,'★ '+c.name]),...WT_LIB.map((c,i)=>['L'+i,'📚 '+c.name+(c.fr>1?' ('+c.fr+')':'')])];
+    wtSelect(sec.firstChild,'',tbls,o.tbl,v=>{if(v[0]==='L'){wtUseLib(t,k,+v.slice(1));renderWt();return}o.tbl=v;wtPushTab(t,k);wtRedraw()},'wtbl');
     const cv=document.createElement('canvas');cv.id='wtCv'+k;cv.className='wtcv';cv.setAttribute('aria-label','Wavetable '+k.toUpperCase());sec.appendChild(cv);wtSizeCv(cv,Math.min(430,window.innerWidth-70),96);
     cv.onpointerdown=e=>{ // dragging over the picture moves the position
       const r=cv.getBoundingClientRect(),mv=ev=>{o.pos=clamp((ev.clientX-r.left)/r.width,0,1);const inp=sec.querySelector('input[data-key="pos"]');if(inp){inp.value=Math.round(o.pos*1000);inp.dispatchEvent(new Event('input'))}};
@@ -5719,23 +5778,28 @@ function renderWt(){
 }
 /* import a wavetable from a .wav file */
 function wtImportDialog(t){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.wav,.wave,audio/*';
+  const inp=document.createElement('input');inp.type='file';inp.accept='.wav,.wave,audio/*';inp.multiple=true;
   inp.onchange=async()=>{
-    const f=inp.files[0];if(!f)return;
-    try{
-      const buf=await f.arrayBuffer();
-      const dc=new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,1,44100),ab=await dc.decodeAudioData(buf);
-      const ch0=ab.getChannelData(0),mono=new Float32Array(ch0.length);
-      for(let c=0;c<ab.numberOfChannels;c++){const d=ab.getChannelData(c);for(let i=0;i<d.length;i++)mono[i]+=d[i]/ab.numberOfChannels}
-      const tb=wtImportBuffer(mono,f.name);
-      if(!tb){toast('That file is too short to be a wavetable');return}
-      pushUndo();const w=WTP(t);w.cust=w.cust||[];
-      let idx=w.cust.length<2?w.cust.length:(w.cust.findIndex((c,i)=>w.a.tbl!=='c'+i&&w.b.tbl!=='c'+i));if(idx<0)idx=0;
-      w.cust[idx]=tb;w.a.tbl='c'+idx;wtPushTab(t,'a');if(w.b.tbl==='c'+idx)wtPushTab(t,'b');
-      changed();renderWt();toast('Wavetable loaded: '+tb.name+' ('+tb.fr+(tb.fr===1?' frame':' frames')+') on oscillator A');
-    }catch(e){console.warn(e);toast('Could not read that audio file')}
+    const fs=[...inp.files];if(!fs.length)return;
+    let ok=0,bad=0,last=-1;toast('Reading '+fs.length+' file'+(fs.length>1?'s':'')+'…');
+    for(const f of fs){
+      try{
+        const tb=await wtReadFile(f);if(!tb){bad++;continue}
+        let i=WT_LIB.findIndex(x=>x.b64===tb.b64);if(i<0){i=WT_LIB.length;WT_LIB.push(tb);ok++}else ok++;last=i;
+      }catch(e){console.warn(e);bad++}
+    }
+    if(ok){const lb=last>=0?WT_LIB[last].b64:null;WT_LIB.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));if(lb)last=WT_LIB.findIndex(x=>x.b64===lb);await wtLibSave()}
+    if(last<0){toast('Could not read '+(fs.length>1?'those files':'that file')+' as a wavetable');return}
+    pushUndo();
+    if(fs.length===1){wtUseLib(t,'a',last);const tb=WT_LIB[last];changed();renderWt();toast('Wavetable loaded: '+tb.name+' ('+tb.fr+(tb.fr===1?' frame':' frames')+') on oscillator A')}
+    else{changed();renderWt();toast(ok+' tables added to your library'+(bad?' ('+bad+' skipped)':'')+' — pick them in the oscillator table list under “Library”')}
   };
   inp.click();
+}
+function wtLibClear(t){
+  if(!WT_LIB.length){toast('The library is empty');return}
+  if(!confirm('Remove all '+WT_LIB.length+' imported wavetables from the library on this device? Tables already used in projects stay in those projects.'))return;
+  WT_LIB=[];wtLibSave();renderWt();toast('Library cleared');
 }
 
 /* ---------------- Acid Synth: a compact TB-303 style panel over the wavetable engine ---------------- */
