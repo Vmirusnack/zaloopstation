@@ -424,7 +424,8 @@ struct BlockCtx
 class Synth
 {
 public:
-    Synth() : tables (std::make_unique<Tables>()) {}
+    Synth() : tables (std::make_shared<Tables>()) {}
+    explicit Synth (std::shared_ptr<Tables> shared) : tables (std::move (shared)) {}   // many synths can share one set of tables
 
     Tables& bank() { return *tables; }
     const Tables& bank() const { return *tables; }
@@ -564,7 +565,7 @@ public:
     int activeVoices() const { int c = 0; for (auto& v : voices) if (v.active) ++c; return c; }
 
 private:
-    std::unique_ptr<Tables> tables;
+    std::shared_ptr<Tables> tables;
     std::array<Voice, kVoices> voices;
     std::vector<int> held;
     std::vector<float> cutA, resA, drvA, volA;
