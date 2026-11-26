@@ -149,7 +149,22 @@ private:
                              { "buffer", d ? d->getCurrentBufferSizeSamples() : 0 }, { "latencyMs", d ? 1000.0 * d->getOutputLatencyInSamples() / std::max (1.0, d->getCurrentSampleRate()) : 0.0 } }));
             }
             else if (cmd == "project") app.setProject (m.getProperty ("project", {}));
-            else if (cmd == "play") r.play();
+            else if (cmd == "play") r.play ((int) std::llround ((double) m.getProperty ("delayMs", 0.0) * r.sampleRateNow() / 1000.0));
+            else if (cmd == "wavetable")
+            {
+                // user wavetable for slot 0-3: base64 of little-endian float32, frames of 2048 samples
+                juce::MemoryOutputStream out; juce::String err;
+                const int slot = (int) m.getProperty ("slot", 0);
+                if (! juce::Base64::convertFromBase64 (out, m.getProperty ("data", "").toString())) err = "bad data";
+                const size_t nFloat = out.getDataSize() / sizeof (float), nf = nFloat / (size_t) ls::kTable;
+                if (err.isEmpty() && (nf < 1 || nf > (size_t) ls::kMaxFrames || slot < 0 || slot >= ls::kCustom)) err = "bad size or slot";
+                if (err.isEmpty())
+                {
+                    std::vector<float> fr (nf * (size_t) ls::kTable); std::memcpy (fr.data(), out.getData(), fr.size() * sizeof (float));
+                    r.tableBank().setCustom (slot, ls::buildTableSet (fr.data(), (int) nf, m.getProperty ("name", "User").toString().toStdString()));
+                }
+                send (obj ({ { "t", "wavetable" }, { "slot", slot }, { "error", err } }));
+            }
             else if (cmd == "stop") r.stop();
             else if (cmd == "panic") r.panic();
             else if (cmd == "seek") r.seekBeats ((double) m.getProperty ("beats", 0.0));

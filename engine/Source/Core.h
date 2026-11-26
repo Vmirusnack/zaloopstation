@@ -119,7 +119,7 @@ public:
         plan.store (raw, std::memory_order_release);
         while (plans.size() > 8) plans.erase (plans.begin());      // old plans stay alive long enough for a running block
     }
-    void play() { playReq.store (1); }
+    void play (int delaySamples = 0) { playDelay.store (std::max (0, delaySamples)); playReq.store (1); }   // delay: lets the UI line the start up with its own audio latency
     void stop() { playReq.store (2); }
     void seekBeats (double beats) { seekReqBeats.store (beats); seekFlag.store (true); }
     // live notes from a MIDI keyboard or the on-screen keys (one producer thread)
@@ -131,6 +131,8 @@ public:
         liveW.store (w + 1, std::memory_order_release);
     }
     void panic() { panicReq.store (true); }
+    ls::Tables& tableBank() { return *tables; }       // user wavetables are shared by all synth tracks
+    double sampleRateNow() const { return sr; }
 
     double positionBeats() const { return posBeats.load(); }
     bool playing() const { return isPlaying.load(); }
@@ -154,8 +156,8 @@ public:
 
         if (panicReq.exchange (false)) for (auto* r : P.rt) r->synth->allOff();
         const int pr = playReq.exchange (0);
-        if (pr == 1 && ! playingA) { playingA = true; }
-        else if (pr == 2 && playingA) { playingA = false; for (auto* r : P.rt) r->synth->allOff(); }
+        if (pr == 1 && ! playingA) { playingA = true; delayLeft = playDelay.load(); }
+        else if (pr == 2 && playingA) { playingA = false; delayLeft = 0; for (auto* r : P.rt) r->synth->allOff(); }
         if (seekFlag.exchange (false)) { pos = (int64_t) std::llround (std::max (0.0, seekReqBeats.load()) * P.spb); for (auto* r : P.rt) r->synth->allOff(); }
         isPlaying.store (playingA);
 
@@ -174,11 +176,13 @@ public:
         while (done < n)
         {
             int seg = n - done;
-            if (playingA && P.proj.loop && pos < P.loopEnd) seg = (int) std::min<int64_t> (seg, P.loopEnd - pos);
-            renderSegment (P, anySolo, done, seg);
-            if (playingA) pos += seg;
+            const bool adv = playingA && delayLeft == 0;
+            if (playingA && delayLeft > 0) seg = std::min (seg, delayLeft);
+            else if (adv && P.proj.loop && pos < P.loopEnd) seg = (int) std::min<int64_t> (seg, P.loopEnd - pos);
+            renderSegment (P, anySolo, done, seg, adv);
+            if (adv) pos += seg; else if (playingA) delayLeft -= seg;
             done += seg;
-            if (playingA && P.proj.loop && pos >= P.loopEnd) { pos = P.loopStart; for (auto* r : P.rt) r->synth->allOff(); }
+            if (adv && P.proj.loop && pos >= P.loopEnd) { pos = P.loopStart; for (auto* r : P.rt) r->synth->allOff(); }
         }
 
         // master
@@ -203,7 +207,7 @@ private:
 
     static void maxStore (std::atomic<float>& a, float v) { float o = a.load (std::memory_order_relaxed); if (v > o) a.store (v, std::memory_order_relaxed); }
 
-    void renderSegment (const Plan& P, bool anySolo, int off, int seg)
+    void renderSegment (const Plan& P, bool anySolo, int off, int seg, bool adv)
     {
         const int64_t p0 = pos, p1 = pos + seg;
         for (size_t ti = 0; ti < P.rt.size(); ++ti)
@@ -212,7 +216,7 @@ private:
             TrackRt& rt = *P.rt[ti];
             float* tl = rt.sl.data(); float* tr = rt.sr_.data();
             int c = 0;
-            if (playingA)
+            if (adv)
             {
                 const auto& ev = P.ev[ti];
                 auto it = std::lower_bound (ev.begin(), ev.end(), p0, [] (const Ev& e, int64_t s) { return e.sample < s; });
@@ -254,7 +258,7 @@ private:
     Smooth sm[kMaxTracks];
     double mGain = 1.0;
     // transport
-    std::atomic<int> playReq { 0 }; std::atomic<bool> seekFlag { false }, panicReq { false }; std::atomic<double> seekReqBeats { 0 };
+    std::atomic<int> playReq { 0 }, playDelay { 0 }; int delayLeft = 0; std::atomic<bool> seekFlag { false }, panicReq { false }; std::atomic<double> seekReqBeats { 0 };
     std::atomic<bool> isPlaying { false }; std::atomic<double> posBeats { 0 };
     bool playingA = false; int64_t pos = 0;
     // meters

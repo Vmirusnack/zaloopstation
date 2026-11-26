@@ -86,6 +86,14 @@ int main (int argc, char** argv)
         for (int i = 0; i < 100; ++i) { r.process (L.data(), R.data(), 256); if (i == 99) for (float v : L) e2 += (double) v * v; }
         CHECK (e1 > 0 && e2 > 0 && e2 < e1, "edit while playing: same track keeps playing, new gain applies");
     }
+    // 7. delayed start (lines the engine up with the UI's own latency)
+    {
+        le::Renderer r; r.prepare (sr, 256); le::Project p; p.bpm = 120; p.tracks.push_back (synthTrack (1, 57, 0.0, 2.0)); r.setProject (p); r.play (4800);
+        std::vector<float> L (256), R (256), all; for (int i = 0; i < 60; ++i) { r.process (L.data(), R.data(), 256); all.insert (all.end(), L.begin(), L.end()); }
+        size_t first = 0; while (first < all.size() && std::fabs (all[first]) < 1e-5) ++first;
+        std::printf ("      delayed start: first sample %zu (asked 4800)\n", first);
+        CHECK (first >= 4800 && first < 4800 + 64, "play with a delay starts the song that many samples later");
+    }
     if (argc > 1)
     {
         le::Project p; p.bpm = 150; p.loop = true; p.loopEnd = 4; auto b = synthTrack (1, 38, 0.0, 0.4, 4); b.synth.a.table = 1; b.synth.cut = 600; b.gain = 0.9f;

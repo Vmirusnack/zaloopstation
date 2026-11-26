@@ -18,6 +18,7 @@
     "productName": "Loop Studio",
     "directories": { "output": "dist", "buildResources": "build" },
     "files": ["electron/**", "www/**", "package.json"],
+    "extraResources": [{ "from": "engine-bin", "to": "engine", "filter": ["**/*"] }],
     "win": { "target": ["nsis", "portable"] },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
     "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.music", "identity": null },

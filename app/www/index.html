@@ -780,6 +780,7 @@ html.phone body{position:fixed;inset:0}
     <tr><td>Count-in</td><td>Inspector ▸ Count-in (Off, 1 bar, 2 bars). When Record is on and you press Play, the metronome counts the bars first, then the recording and the song start together</td></tr>
     <tr><td>Takes</td><td>Record with the loop on and every pass becomes its own take, stacked in the lane. The last take plays; select any take and use Takes here in the Inspector to play only that one or to mute it. Split takes with the scissors to build a comp from the best phrases</td></tr>
     <tr><td>Automate OTT and Autotune</td><td>Auto button ▸ choose an OTT or Autotune parameter, draw the curve, or set the track to Touch / Latch / Write and move the slider while playing. Works in the bounce too</td></tr>
+    <tr><td>Loop Synth (native)</td><td>Desktop app only. Add track ▸ Loop Synth (native). The notes are played by the native audio engine (LoopEngine) straight to the sound card, with the same synth as the Loop Synth VST3: wavetables (also your own Serum .wav files), 3 LFOs and a modulation matrix. The fader, pan, mute and solo work. Inserts, sends, automation and export do not reach these tracks yet. If they sound early or late against other tracks, change Engine ▸ Sync offset.</td></tr>
     <tr><td>Sound health</td><td>Appearance ▸ Sound and performance ▸ Sound health… counts dropouts, page freezes and stuck notes and gives a report you can copy. A note that is held for more than 25 seconds with no key down is released automatically; there is also a limit on how many voices sound at once</td></tr>
     <tr><td>Hanging notes and crackle</td><td>Esc releases every note you are holding. Press Stop again while stopped to cut everything that still sounds (“panic”). Notes from the computer keyboard also work with a Ukrainian or Russian layout. If the sound crackles, open Appearance ▸ Sound and performance and set Audio buffer to Safe (reload the page after), and turn on Light visuals. The app warns you when it notices the sound breaking up.</td></tr>
     <tr><td>Rainbow sounds</td><td>Wavetable Synth presets “Rainbow lead (glide)”, “Rainbow dive” and “Rainbow rise”: a fast pitch envelope on a thick saw stack makes the harmonics fan out (dive falls, rise climbs, the lead slides between overlapping notes). Put a Key Harmonizer after them to tune the sweep into the key. The “Rainbow Drop” template shows it all at 200 BPM.</td></tr>
@@ -825,12 +826,12 @@ const mtof=p=>440*Math.pow(2,(p-69)/12);
 const DRUMS={36:'Kick',37:'Rim',38:'Snare',39:'Clap',41:'Low Tom',42:'Closed Hat',43:'Floor Tom',45:'Mid Tom',46:'Open Hat',47:'Tom',48:'High Tom',49:'Crash'};
 const COLORS=['#5aa9ff','#52d08a','#ff9f43','#b58cff','#3ed2c9','#ff6f91','#e8c547','#8fa3ff'];
 const DEFREV={synth:.18,bass:0,pad:.4,keys:.22,drums:.1,slicer:.05,audio:0};   // only used to carry old projects and templates over to a Reverb bus
-const TYPES={synth:'Synth Lead',bass:'Bass',pad:'Pad',keys:'Keys',drums:'Drum Kit',kick:'Kick Designer',kb:'Kick Builder',hard:'Hard Synth',wt:'Wavetable Synth',acid:'Acid Synth (303)',sfx:'FX Riser / Impact',slicer:'Sample Slicer',audio:'Audio Track'};
+const TYPES={synth:'Synth Lead',bass:'Bass',pad:'Pad',keys:'Keys',drums:'Drum Kit',kick:'Kick Designer',kb:'Kick Builder',hard:'Hard Synth',wt:'Wavetable Synth',acid:'Acid Synth (303)',ls:'Loop Synth (native)',sfx:'FX Riser / Impact',slicer:'Sample Slicer',audio:'Audio Track'};
 const BARS=64;
 const SMP={},LAST={};
 let uid=1;
 const S={bpm:100,master:0.8,tracks:[],buses:[],selBus:null,selTrack:null,selRegion:null,playing:false,rec:false,cycle:true,
-  cycleStart:0,cycleEnd:32,metro:false,pos:0,zx:28,snapArr:4,typing:false,octave:0,masterFx:[],markers:[],autoView:false,autoParam:'vol',mixView:'all',dim:false,notes:'',tnotes:{}};
+  cycleStart:0,cycleEnd:32,metro:false,pos:0,zx:28,snapArr:4,typing:false,octave:0,masterFx:[],markers:[],autoView:false,autoParam:'vol',mixView:'all',dim:false,notes:'',tnotes:{},lsUser:[null,null,null,null]};
 let MCH=null,kL=null,kR=null;
 const MASTER={get fx(){return S.masterFx},get ch(){return MCH}};  // lets the insert UI treat the master bus like a track
 
@@ -838,7 +839,7 @@ const isAcid=t=>t.type==='wt'&&!!(t.wt&&t.wt.acid),typeKey=t=>isAcid(t)?'acid':t
 function newTrack(type,name){
   if(type==='acid'){const t=newTrack('wt',name||'Acid Synth');wtApplyPreset(t,'acid303');return t}
   const d={synth:{wave:'sawtooth',cutoff:.7,rel:.25,rev:0},bass:{wave:'sawtooth',cutoff:.35,rel:.12,rev:0},
-    pad:{wave:'sawtooth',cutoff:.5,rel:1.1,rev:0},keys:{wave:'sine',cutoff:.8,rel:.5,rev:0},drums:{wave:'',cutoff:1,rel:.1,rev:0},kick:{wave:'',cutoff:1,rel:.1,rev:0},kb:{wave:'',cutoff:1,rel:.1,rev:0},hard:{wave:'sawtooth',cutoff:.7,rel:.2,rev:0},wt:{wave:'',cutoff:1,rel:.1,rev:0},sfx:{wave:'',cutoff:1,rel:.1,rev:0},slicer:{wave:'',cutoff:1,rel:.05,rev:0,smp:null},audio:{wave:'',cutoff:1,rel:.1,rev:0}}[type];
+    pad:{wave:'sawtooth',cutoff:.5,rel:1.1,rev:0},keys:{wave:'sine',cutoff:.8,rel:.5,rev:0},drums:{wave:'',cutoff:1,rel:.1,rev:0},kick:{wave:'',cutoff:1,rel:.1,rev:0},kb:{wave:'',cutoff:1,rel:.1,rev:0},hard:{wave:'sawtooth',cutoff:.7,rel:.2,rev:0},wt:{wave:'',cutoff:1,rel:.1,rev:0},ls:{wave:'',cutoff:1,rel:.1,rev:0},sfx:{wave:'',cutoff:1,rel:.1,rev:0},slicer:{wave:'',cutoff:1,rel:.05,rev:0,smp:null},audio:{wave:'',cutoff:1,rel:.1,rev:0}}[type];
   return Object.assign({id:uid++,type,name:name||TYPES[type],color:COLORS[S.tracks.length%COLORS.length],vol:.75,pan:0,mute:false,solo:false,arm:false,regions:[],fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read',ch:null},d);
 }
 function newRegion(start,len,name){return {id:uid++,start,len,name:name||'Region',notes:[]}}
@@ -918,6 +919,7 @@ function startVoice(t,p,when,vel,dur){
   if(t.type==='kb')return kbVoice(t,p,when,vel);
   if(t.type==='hard')return hardVoice(t,p,when,vel);
   if(t.type==='wt')return wtVoice(t,p,when,vel);
+  if(t.type==='ls')return lsVoice(t,p,when,vel);
   if(t.type==='sfx')return sfxVoice(t,p,when,vel,dur);
   const f=mtof(p),cut=200*Math.pow(60,t.cutoff),env=ac.createGain(),rel=ac.createGain(),fl=ac.createBiquadFilter();
   fl.type='lowpass';fl.Q.value=t.type==='bass'?3:1.2;
@@ -983,7 +985,7 @@ function curBeat(){
 function scheduleRange(a,b){
   const spb=60/S.bpm;
   S.tracks.forEach(t=>scheduleAuto(t,a,b,beatToCtx,FRESH));
-  S.tracks.forEach(t=>{const pad=2+Math.abs(t.dly||0)/1000/spb;t.regions.forEach(r=>{
+  S.tracks.forEach(t=>{if(t.type==='ls')return;const pad=2+Math.abs(t.dly||0)/1000/spb;t.regions.forEach(r=>{
     if(r.mute)return;
     if(r.clip){if(r.start+r.len<=a||r.start>=b)return;playAudioRegion(t,r,a,b,beatToCtx,FRESH,S.cycle&&S.cycleEnd>S.cycleStart?S.cycleEnd:undefined);return}
     if(r.start+r.len+pad<=a||r.start-pad>=b)return;
@@ -1069,7 +1071,7 @@ let focusArea='arrange',saveT=null;const undoStack=[],redoStack=[];
 const replacer=(k,v)=>k==='ch'||k==='_wr'||k==='_resync'?undefined:v;
 function fixUid(){fixUid0();migrateReverb()}
 function fixUid0(){uid=Math.max(uid,1+Math.max(0,...(S.masterFx||[]).map(f=>f.id),...(S.markers||[]).map(m=>m.id),...S.tracks.flatMap(t=>[t.id,...t.regions.flatMap(r=>[r.id,r.clip||0]),...(t.fx||[]).map(f=>f.id)]),...S.buses.flatMap(b=>[b.id,...(b.fx||[]).map(f=>f.id)])))}
-const snapshot=()=>JSON.stringify({bpm:S.bpm,cycleStart:S.cycleStart,cycleEnd:S.cycleEnd,tracks:S.tracks,buses:S.buses,masterFx:S.masterFx,markers:S.markers,notes:S.notes,tnotes:S.tnotes,noGlue:!!S.noGlue},replacer);
+const snapshot=()=>JSON.stringify({bpm:S.bpm,cycleStart:S.cycleStart,cycleEnd:S.cycleEnd,tracks:S.tracks,buses:S.buses,masterFx:S.masterFx,markers:S.markers,notes:S.notes,tnotes:S.tnotes,noGlue:!!S.noGlue,lsUser:S.lsUser},replacer);
 function changed(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('loopstudio.v1',snapshot())}catch(e){}},500)}
 function pushUndo(){undoStack.push(snapshot());if(undoStack.length>60)undoStack.shift();redoStack.length=0}
 function restore(str){
@@ -1077,7 +1079,7 @@ function restore(str){
   S.tracks=d.tracks.map(td=>Object.assign({fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},td,{ch:old.has(td.id)?old.get(td.id).ch:null}));
   S.buses=(d.buses||[]).map(b=>Object.assign({fx:[]},b,{ch:oldB.has(b.id)?oldB.get(b.id).ch:null}));
   S.masterFx=d.masterFx||[];S.markers=d.markers||[];S.tracks.forEach(t=>{t._resync=true});S.bpm=d.bpm;S.cycleStart=d.cycleStart;S.cycleEnd=d.cycleEnd;$('tempo').value=S.bpm;
-  fixUid();
+  S.lsUser=d.lsUser||[null,null,null,null];fixUid();
   if(!S.tracks.some(t=>t.id===S.selTrack))S.selTrack=S.tracks[0]&&S.tracks[0].id;
   if(!findRegion(S.selRegion))S.selRegion=null;R.sel.clear();
   S.tracks.forEach(t=>{if(t.ch)rebuildFx(t)});S.buses.forEach(b=>{if(b.ch)rebuildFx(b)});if(S.selBus>0&&!S.buses.some(b=>b.id===S.selBus))S.selBus=null;if(ac){rebuildFx(MASTER);applyMix();S.tracks.forEach(t=>{if(t.ch&&isShaped(t))applyDrive(t);if(t.type==='wt'&&t.ch&&t.ch.wtn){wtPush(t);wtPushTab(t,'a');wtPushTab(t,'b');wfxRewire(t)}})}renderAll();changed();
@@ -1115,7 +1117,7 @@ function demoProject(){
 }
 function loadProject(){
   try{const raw=localStorage.getItem('loopstudio.v1');if(raw){const d=JSON.parse(raw);
-    if(d&&d.tracks&&d.tracks.length){S.tracks=d.tracks.map(t=>Object.assign({ch:null,fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},t));S.buses=(d.buses||[]).map(b=>Object.assign({fx:[],ch:null},b));S.masterFx=d.masterFx||[];S.markers=d.markers||[];S.notes=d.notes||'';S.tnotes=d.tnotes||{};S.noGlue=!!d.noGlue;S.bpm=d.bpm||100;S.cycleStart=d.cycleStart||0;S.cycleEnd=d.cycleEnd||32;
+    if(d&&d.tracks&&d.tracks.length){S.lsUser=d.lsUser||[null,null,null,null];S.tracks=d.tracks.map(t=>Object.assign({ch:null,fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},t));S.buses=(d.buses||[]).map(b=>Object.assign({fx:[],ch:null},b));S.masterFx=d.masterFx||[];S.markers=d.markers||[];S.notes=d.notes||'';S.tnotes=d.tnotes||{};S.noGlue=!!d.noGlue;S.bpm=d.bpm||100;S.cycleStart=d.cycleStart||0;S.cycleEnd=d.cycleEnd||32;
       fixUid();S.selTrack=S.tracks[0].id;return}}}catch(e){}
   demoProject();
 }
@@ -1290,7 +1292,7 @@ function renderInspector(){
   <div class="row"><label>Instrument</label><select class="sb" id="iTt">${Object.entries(TYPES).filter(([k])=>(k==='audio')===(t.type==='audio')).map(([k,v])=>`<option value="${k}"${k===typeKey(t)?' selected':''}>${v}</option>`).join('')}</select></div>
   ${t.type==='audio'?'<div class="btnrow"><button class="mini" id="iAud">Add audio file…</button></div>'+audInputHtml(t):''}
   ${hasWave?`<div class="row"><label>Waveform</label><select class="sb" id="iTw">${['sawtooth','square','triangle','sine'].map(w=>`<option${w===t.wave?' selected':''}>${w}</option>`).join('')}</select></div>`:''}
-  ${t.type!=='drums'&&t.type!=='slicer'&&t.type!=='audio'&&!isHardType(t)?`<div class="row"><label>Cutoff</label><input type="range" id="iTc" min="0" max="1" step=".01" value="${t.cutoff}"></div>
+  ${t.type!=='drums'&&t.type!=='slicer'&&t.type!=='audio'&&t.type!=='ls'&&!isHardType(t)?`<div class="row"><label>Cutoff</label><input type="range" id="iTc" min="0" max="1" step=".01" value="${t.cutoff}"></div>
   <div class="row"><label>Release</label><input type="range" id="iTr" min=".03" max="2.5" step=".01" value="${t.rel}"></div>`:''}
   ${t.type==='drums'?drummerHtml(t,r):''}
   <div id="instBox"></div>
@@ -2897,7 +2899,7 @@ async function openProjectFile(file){
   try{
     const d=JSON.parse(await file.text());if(!d||!d.project||!Array.isArray(d.project.tracks))throw new Error('bad');
     if(S.playing)pause();dropChains();const P=d.project;
-    S.tracks=P.tracks.map(td=>Object.assign({fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},td,{ch:null}));S.buses=(P.buses||[]).map(b=>Object.assign({fx:[]},b,{ch:null}));S.masterFx=P.masterFx||[];S.markers=P.markers||[];S.notes=P.notes||'';S.tnotes=P.tnotes||{};S.noGlue=!!P.noGlue;S.selBus=null;S.bpm=P.bpm||100;S.cycleStart=P.cycleStart||0;S.cycleEnd=P.cycleEnd||32;
+    S.lsUser=P.lsUser||[null,null,null,null];S.tracks=P.tracks.map(td=>Object.assign({fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},td,{ch:null}));S.buses=(P.buses||[]).map(b=>Object.assign({fx:[]},b,{ch:null}));S.masterFx=P.masterFx||[];S.markers=P.markers||[];S.notes=P.notes||'';S.tnotes=P.tnotes||{};S.noGlue=!!P.noGlue;S.selBus=null;S.bpm=P.bpm||100;S.cycleStart=P.cycleStart||0;S.cycleEnd=P.cycleEnd||32;
     initAudio();
     for(const t of S.tracks)if(t.type==='slicer'&&t.smp){delete SMP[t.id];const s=d.samples&&d.samples[t.id];
       if(s){const bytes=b64ToBuf(s.data);try{SMP[t.id]={buf:await ac.decodeAudioData(bytes.slice(0)),bytes};idbPut('smp'+t.id,bytes)}catch(e){}}}
@@ -4571,7 +4573,7 @@ function startProject(kind){
   renderAll();layoutBottom();uiTransport();changed();
 }
 function loadFrom(d){
-  S.tracks=d.tracks.map(t=>Object.assign({ch:null,fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},t));S.buses=(d.buses||[]).map(b=>Object.assign({fx:[],ch:null},b));
+  S.lsUser=d.lsUser||[null,null,null,null];S.tracks=d.tracks.map(t=>Object.assign({ch:null,fx:[],sends:{},auto:{vol:[],pan:[]},autoMode:'read'},t));S.buses=(d.buses||[]).map(b=>Object.assign({fx:[],ch:null},b));
   S.masterFx=d.masterFx||[];S.markers=d.markers||[];S.notes=d.notes||'';S.tnotes=d.tnotes||{};S.noGlue=!!d.noGlue;S.bpm=d.bpm||100;S.cycleStart=d.cycleStart||0;S.cycleEnd=d.cycleEnd||32;
   fixUid();S.selTrack=S.tracks[0]?S.tracks[0].id:null;
 }
@@ -4906,6 +4908,7 @@ function mountInst(t){
     box.appendChild(selRow('Distortion',{tanh:'Soft',hard:'Hard clip',fold:'Fold'},h.mode,v=>{h.mode=v;applyDrive(t);changed()}));
     box.appendChild(instRows(t,h,HS_SPEC,key=>{if(key==='drive'||key==='clip')applyDrive(t)}));
     const b=document.createElement('div');b.className='btnrow';b.innerHTML='<button class="mini">▶ Audition</button>';b.firstChild.onclick=()=>auditionTrack(t,h.sub>.5||h.cut<.4?41:65,.7);box.appendChild(b);
+  }else if(t.type==='ls'){lsInst(t,box,head)
   }else if(t.type==='wt'&&WTP(t).acid){acidInst(t,box,head)
   }else if(t.type==='wt'){
     head.textContent='Wavetable Synth';box.appendChild(head);
@@ -8049,7 +8052,7 @@ function logicKey(e){
     if(k==='ArrowRight'||k==='ArrowLeft'){S.zx=clamp(S.zx*(k==='ArrowRight'?1.25:.8),10,90);$('zoomArr').value=S.zx;applyZoom();return true}
   }
   if(mod&&alt){
-    if(kl==='n'){showMenu($('addTrack'),Object.entries(TYPES).map(([kk,v])=>[v,()=>addTrack(kk)]));return true}
+    if(kl==='n'){showMenu($('addTrack'),Object.entries(TYPES).filter(([k])=>k!=='ls'||window.loopEngine).map(([kk,v])=>[v,()=>addTrack(kk)]));return true}
     if(kl==='i'){$('midIn').click();return true}
     return false;
   }
@@ -8328,7 +8331,7 @@ function bind(){
   $('snapRoll').onchange=e=>{R.snap=+e.target.value;renderRoll()};
   $('toolPtr').onclick=()=>setTool('ptr');$('toolPen').onclick=()=>setTool('pen');$('bQuant').onclick=quantizeSel;
   $('bFn').onclick=e=>showMenu(e.currentTarget,[['Legato (fill gaps)',()=>noteFn('legato')],['Humanize',()=>noteFn('humanize')],['Reverse order',()=>noteFn('reverse')],['Velocity to 100',()=>noteFn('vel100')],['Transpose +1',()=>noteFn('tr1')],['Transpose −1',()=>noteFn('tr-1')],['Transpose +12',()=>noteFn('tr12')],['Transpose −12',()=>noteFn('tr-12')]]);
-  $('addTrack').onclick=e=>showMenu(e.currentTarget,Object.entries(TYPES).map(([k,v])=>[v,()=>addTrack(k)]));
+  $('addTrack').onclick=e=>showMenu(e.currentTarget,Object.entries(TYPES).filter(([k])=>k!=='ls'||window.loopEngine).map(([k,v])=>[v,()=>addTrack(k)]));
   $('bFile').onclick=e=>showMenu(e.currentTarget,[['Start page / new project…',showWelcome],['Appearance and themes…',toggleAppear],['Open project…',()=>$('projIn').click()],['Save project',saveProject],['Bounce project to WAV',()=>bounce('project')],['Bounce cycle range to WAV',()=>bounce('cycle')],['Add marker at playhead',()=>addMarker(snapB(headPos(),1))],['Import audio file…',()=>pickAudio(selTrackObj())],['Import MIDI file (.mid)…',()=>$('midIn').click()],['Export MIDI file (.mid)',exportMidi],['Export stems (ZIP of WAV files)',exportStems]]);
   $('audIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importAudio(f,audTarget);audTarget=null});
   $('midIn').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)importMidiFiles(fs)});
@@ -8924,5 +8927,185 @@ bindRoll();bindSlicer();bind();bindExtras();renderAll();layoutBottom();loadSampl
   }
   function afterTake(){renderLanes();renderInspector();changed();if(S.playing)S._resync=true}
 })();
+
+
+/* ============ Loop Synth (native): tracks played by the native audio engine (LoopEngine, desktop app only) ============
+   These tracks make no sound in the web audio graph. The page sends the notes and the synth settings to the engine
+   (window.loopEngine, provided by the desktop app) and the engine plays them straight to the sound card. */
+const LS_DEF=(()=>{const d={a_table:0,a_pos:0,a_oct:0,a_fine:0,a_level:1,a_uni:1,a_det:.25,a_spread:.6,b_table:0,b_pos:0,b_oct:0,b_fine:0,b_level:0,b_uni:1,b_det:.25,b_spread:.6,
+  sub:0,rnd:0,ftype:0,cut:20000,res:0,fdrive:1,fenv:0,fkey:0,fa:.005,fd:.3,fs:.5,fr:.2,aa:.003,ad:.3,as:.8,ar:.15,poslenv:0,mono:0,glide:0,bend:2,vel:.6,dtype:0,dist:0,master:.7};
+  for(let i=1;i<=3;i++){d['l'+i+'_shape']=0;d['l'+i+'_rate']=2;d['l'+i+'_sync']=0;d['l'+i+'_div']=4}
+  for(let i=1;i<=8;i++){d['m'+i+'_src']=0;d['m'+i+'_dst']=0;d['m'+i+'_amt']=0}
+  return d})();
+const LS_PRESETS={"Init": {}, "Zaag Lead": {"a_table": 2.0, "a_pos": 0.55, "a_uni": 5.0, "a_det": 0.35, "b_level": 0.5, "b_table": 0.0, "b_oct": -1.0, "b_uni": 3.0, "cut": 5200.0, "res": 0.25, "fenv": 0.3, "fd": 0.5, "as": 0.85, "ar": 0.25, "dist": 0.35, "dtype": 0.0}, "Raw Screech": {"a_table": 2.0, "a_pos": 0.9, "a_uni": 7.0, "a_det": 0.6, "cut": 3400.0, "res": 0.45, "fenv": 0.5, "fd": 0.25, "fs": 0.3, "poslenv": 0.35, "dist": 0.65, "dtype": 1.0, "as": 0.9, "ar": 0.2}, "Sub Bass": {"a_table": 1.0, "a_pos": 0.1, "sub": 0.7, "cut": 420.0, "res": 0.1, "mono": 1.0, "glide": 0.06, "as": 1.0, "ar": 0.1}, "Acid Squelch": {"a_table": 0.0, "a_pos": 0.0, "mono": 1.0, "glide": 0.05, "cut": 380.0, "res": 0.88, "fenv": 0.75, "fd": 0.22, "fs": 0.0, "fdrive": 2.2, "as": 0.8, "ad": 0.25, "ar": 0.08}, "Hoover Stack": {"a_table": 3.0, "a_pos": 0.35, "a_uni": 7.0, "a_det": 0.85, "a_spread": 1.0, "b_level": 0.7, "b_table": 0.0, "b_uni": 7.0, "b_det": 0.7, "cut": 4800.0, "res": 0.2, "dist": 0.5, "dtype": 2.0, "aa": 0.01, "ar": 0.35}, "Wobble Reese": {"a_table": 0.0, "a_pos": 0.15, "a_uni": 5.0, "a_det": 0.45, "b_level": 0.6, "b_table": 3.0, "b_oct": -1.0, "b_uni": 3.0, "b_det": 0.3, "cut": 700.0, "res": 0.35, "dist": 0.45, "dtype": 2.0, "as": 1.0, "ar": 0.12, "l1_shape": 0.0, "l1_sync": 1.0, "l1_div": 5.0, "m1_src": 1.0, "m1_dst": 6.0, "m1_amt": 0.55, "m2_src": 2.0, "m2_dst": 1.0, "m2_amt": 0.3, "l2_rate": 0.4}, "Morph Pad": {"a_table": 2.0, "a_pos": 0.3, "a_uni": 5.0, "a_det": 0.3, "a_spread": 1.0, "cut": 3200.0, "res": 0.15, "aa": 0.5, "ar": 1.2, "as": 1.0, "l1_shape": 1.0, "l1_rate": 0.25, "m1_src": 1.0, "m1_dst": 1.0, "m1_amt": 0.6}, "Pluck": {"a_table": 0.0, "a_pos": 0.7, "a_uni": 2.0, "cut": 900.0, "res": 0.3, "fenv": 0.8, "fd": 0.18, "fs": 0.0, "as": 0.0, "ad": 0.35, "ar": 0.2}};
+const LS_TABLES=['Saw - Square','Sine - Saw','Zaag Formant','Digital'];
+const LS_SHAPES=['Sine','Triangle','Saw','Square','Sample & hold'],LS_DIVS=['4 bars','2 bars','1 bar','1/2','1/4','1/8','1/16','1/32'];
+const LS_SRCS=['-','LFO 1','LFO 2','LFO 3','Filter env','Amp env','Velocity','Key','Mod wheel','Random'];
+const LS_DSTS=['-','A position','B position','A pitch','B pitch','Pitch (all)','Cutoff','Resonance','A level','B level','Sub level'];
+const LSP=t=>{const o=t.ls=t.ls||{};o.p=o.p||{};return o};
+const lsFull=t=>Object.assign({},LS_DEF,LSP(t).p);
+U.sm=v=>v<1?Math.round(v*1000)+' ms':v.toFixed(2)+' s';U.hzr=v=>v.toFixed(2)+' Hz';
+
+const EB={on:false,info:null,err:'',starting:false,dirty:false,last:'',peak:0,tbSent:['','','',''],lc:'',
+  offset:(()=>{try{return +localStorage.getItem('loopstudio.lsoff')||0}catch(e){return 0}})()};
+EB.avail=()=>!!(window.loopEngine&&window.loopEngine.available);
+EB.has=()=>S.tracks.some(t=>t.type==='ls');
+EB.ready=()=>EB.avail()&&EB.on&&!!EB.info;
+EB.send=o=>{try{window.loopEngine.send(o)}catch(e){}};
+EB.build=()=>{
+  const anySolo=S.tracks.some(t=>t.solo);
+  const tracks=S.tracks.filter(t=>t.type==='ls').map(t=>{
+    const notes=[];
+    t.regions.forEach(r=>{if(r.clip||r.mute)return;midiEvents(t,r).forEach(e=>notes.push([e.p,+e.abs.toFixed(4),+Math.max(.02,e.dur).toFixed(4),+(e.v/127).toFixed(3)]))});
+    notes.sort((a,b)=>a[1]-b[1]);
+    return {id:t.id,name:t.name,gain:fg(t.vol),pan:t.pan||0,mute:!!t.mute||(anySolo&&!t.solo),solo:false,synth:lsFull(t),clips:[{start:0,len:BARS*4+16,notes}]};
+  });
+  return {bpm:S.bpm,master:fg(S.master),loop:{on:!!S.cycle&&S.cycleEnd>S.cycleStart,start:S.cycleStart,end:S.cycleEnd},tracks};
+};
+EB.flush=force=>{
+  if(!EB.ready())return;EB.dirty=false;
+  const p=EB.build(),s=JSON.stringify(p);if(!force&&s===EB.last)return;EB.last=s;EB.send({cmd:'project',project:p});
+};
+EB.syncTables=()=>{
+  if(!EB.ready())return;
+  for(let i=0;i<4;i++){const u=S.lsUser&&S.lsUser[i],key=u?u.b64.length+':'+u.b64.slice(0,48)+':'+u.name:'';
+    if(EB.tbSent[i]===key)continue;EB.tbSent[i]=key;if(u)EB.send({cmd:'wavetable',slot:i,name:u.name,data:u.b64})}
+};
+EB.start=async()=>{
+  if(!EB.avail()||EB.starting||EB.on)return;EB.starting=true;EB.err='';EB.paint();
+  try{const r=await window.loopEngine.start();if(!r||!r.ok){EB.err=(r&&r.error)||'The engine did not start';return}EB.on=true;EB.send({cmd:'hello'})}
+  catch(e){EB.err=String(e&&e.message||e)}
+  finally{EB.starting=false;EB.paint()}
+};
+EB.msg=m=>{
+  if(!m)return;
+  if(m.t==='hello'){EB.info=m;EB.on=true;EB.err='';EB.last='';EB.tbSent=['','','',''];EB.syncTables();EB.flush(true);EB.paint();
+    if(S.playing)EB.startPlay()}
+  else if(m.t==='state'){const p=m.master||[0,0];EB.peak=Math.max(p[0]||0,p[1]||0);EB.paintMeter()}
+  else if(m.t==='wavetable'&&m.error){try{toast('Wavetable not loaded: '+m.error)}catch(e){}}
+  else if(m.t==='closed'||m.t==='exit'){EB.on=false;EB.info=null;EB.last='';EB.err=m.t==='exit'?'The engine stopped'+(m.err?': '+String(m.err).slice(-160):''):'The engine connection closed';EB.paint()}
+};
+EB.paint=()=>{
+  const el=document.getElementById('lsStat');if(!el)return;
+  if(!EB.avail()){el.className='hint';el.innerHTML='<b style="color:#e8a24a">The native engine runs only in the Windows or Mac app.</b> In the browser or on the phone these tracks stay silent.';return}
+  if(EB.ready()){const i=EB.info;el.className='hint';el.innerHTML=`<b style="color:#6fd08c">Engine running</b> · ${esc(i.device||'default output')} · ${Math.round(i.sampleRate||0)} Hz · buffer ${i.buffer||'?'} (${i.buffer&&i.sampleRate?(1000*i.buffer/i.sampleRate).toFixed(1):'?'} ms) <span id="lsPk"></span>`;return}
+  el.className='hint';el.innerHTML=EB.starting?'Starting the engine…':'<b style="color:#e8a24a">Engine not running.</b> '+esc(EB.err||'It starts when you press play or audition.')+' <button class="mini" id="lsGo">Start engine</button>';
+  const b=document.getElementById('lsGo');if(b)b.onclick=()=>EB.start();
+};
+EB.paintMeter=()=>{const e=document.getElementById('lsPk');if(e)e.textContent='· peak '+(EB.peak>0.0001?(20*Math.log10(EB.peak)).toFixed(1)+' dB':'−∞')};
+EB.startPlay=()=>{
+  if(!S.playing||!EB.has())return;
+  if(!EB.ready()){if(EB.avail()&&!EB.on&&!EB.starting)EB.start();return}
+  EB.flush(true);EB.syncTables();
+  const now=ac.currentTime,sg=segs[0],spb=60/S.bpm,jsOut=(ac.outputLatency||ac.baseLatency||0)*1000,nat=EB.info.latencyMs||0;
+  let beat,ms;
+  if(sg&&sg.ctx>now){beat=sg.beat;ms=(sg.ctx-now)*1000}else{beat=curBeat();ms=0}
+  ms+=jsOut-nat+EB.offset;
+  if(ms<0){beat+=-ms/1000/spb;ms=0}
+  EB.send({cmd:'seek',beats:Math.max(0,beat)});EB.send({cmd:'play',delayMs:ms});
+};
+EB.cheap=()=>{ // a short key that changes when something the engine needs has changed
+  let k=S.bpm+'|'+S.master+'|'+S.cycle+'|'+S.cycleStart+'|'+S.cycleEnd+'|';
+  S.tracks.forEach(t=>{if(t.type==='ls')k+=t.id+':'+t.vol+':'+t.pan+':'+t.mute+':'+t.solo+':'+t.regions.length+';';else if(t.solo)k+='s'});
+  return k;
+};
+(function(){
+  const wrap=(name,fn)=>{const o=window[name];if(typeof o!=='function')return;window[name]=function(){const r=o.apply(this,arguments);try{fn.apply(this,arguments)}catch(e){console.warn(e)}return r}};
+  wrap('changed',()=>{EB.dirty=true});
+  wrap('applyMix',()=>{EB.dirty=true});
+  wrap('restore',()=>{EB.dirty=true;EB.syncTables()});
+  wrap('setTempo',()=>{EB.dirty=true});
+  wrap('panic',()=>{if(EB.ready())EB.send({cmd:'panic'})});
+  const play0=window.play;
+  window.play=function(){const was=S.playing;const r=play0.apply(this,arguments);if(!was&&S.playing&&EB.has())EB.startPlay();return r};
+  const pause0=window.pause;
+  window.pause=function(){const was=S.playing;const r=pause0.apply(this,arguments);if(was&&EB.ready())EB.send({cmd:'stop'});return r};
+  const bounce0=window.bounce;
+  if(typeof bounce0==='function')window.bounce=async function(){const r=await bounce0.apply(this,arguments);if(EB.has())toast('Native Loop Synth tracks are not part of this export yet');return r};
+  setInterval(()=>{
+    if(!EB.has()||!EB.ready())return;
+    const k=EB.cheap();if(k!==EB.lc){EB.lc=k;EB.dirty=true}
+    if(EB.dirty){EB.syncTables();EB.flush()}
+  },90);
+  if(EB.avail()){
+    window.loopEngine.onMessage(EB.msg);
+    if(EB.has())setTimeout(()=>EB.start(),600);   // a project that already has native tracks gets its engine ready at once
+  }
+})();
+function lsVoice(t,p,when,vel){
+  if(!EB.avail())return null;
+  if(!EB.ready()){EB.start();return null}
+  EB.flush();
+  const send=on=>EB.send({cmd:'note',track:t.id,pitch:p,vel:Math.max(.01,vel/127),on});
+  let ended=false;const go=on=>{if(on===false){if(ended)return;ended=true}send(on)};
+  const dly=Math.max(0,(when-ac.currentTime)*1000);
+  if(dly>2)setTimeout(()=>go(true),dly);else go(true);
+  return {off(time){const d=Math.max(0,(time-ac.currentTime)*1000);if(d>2)setTimeout(()=>go(false),d);else go(false)},kill(){go(false)}};
+}
+function lsInst(t,box,head){
+  head.textContent='Loop Synth (native engine)';box.appendChild(head);
+  const L=LSP(t),P=L.p,dirty=()=>{EB.dirty=true},cur=k=>P[k]===undefined?LS_DEF[k]:P[k];
+  const st=document.createElement('div');st.id='lsStat';st.className='hint';box.appendChild(st);EB.paint();
+  if(EB.avail()&&!EB.on&&!EB.starting)EB.start();
+  box.appendChild(selRow('Preset',Object.assign({'':'Choose…'},Object.fromEntries(Object.keys(LS_PRESETS).map(k=>[k,k]))),'',v=>{if(!v)return;L.p=Object.assign({},LS_PRESETS[v]);dirty();mountInst(t);changed();auditionTrack(t,60,1.2)}));
+  window.LS_OPEN=window.LS_OPEN||new Set(['Oscillator A']);
+  const sec=(title,sub)=>{const d=document.createElement('details');d.open=LS_OPEN.has(title);d.style.cssText='margin:6px 0;border-top:1px solid rgba(255,255,255,.08);padding-top:4px';
+    d.innerHTML=`<summary style="cursor:pointer;font-weight:600;font-size:12px;opacity:.9">${title}${sub?` <span style="opacity:.5;font-weight:400">${sub}</span>`:''}</summary>`;
+    d.addEventListener('toggle',()=>{d.open?LS_OPEN.add(title):LS_OPEN.delete(title)});box.appendChild(d);return d};
+  const sp=(k,label,min,max,u,o)=>Object.assign({k,label,min,max,def:LS_DEF[k],u},o||{});
+  const sel=(d,label,k,names)=>d.appendChild(selRow(label,Object.fromEntries(names.map((n,i)=>[String(i),n])),String(cur(k)),v=>{P[k]=+v;dirty();changed()}));
+  const rows=(d,spec)=>d.appendChild(instRows(t,P,spec,dirty));
+  const tabNames=()=>LS_TABLES.concat([0,1,2,3].map(i=>'User '+(i+1)+(S.lsUser[i]?' · '+S.lsUser[i].name:' (empty)')));
+  ['a','b'].forEach(o=>{
+    const d=sec('Oscillator '+o.toUpperCase());
+    sel(d,'Table',o+'_table',tabNames());
+    rows(d,[sp(o+'_pos','Position',0,1,'pct'),sp(o+'_oct','Octave',-3,3,'n',{step:1}),sp(o+'_fine','Fine',-100,100,'ct'),sp(o+'_level','Level',0,1,'pct'),
+      sp(o+'_uni','Voices',1,7,'n',{step:1}),sp(o+'_det','Detune',0,1,'pct'),sp(o+'_spread','Spread',0,1,'pct')]);
+  });
+  const dw=sec('Wavetables','Serum .wav files');
+  {const slotSel=document.createElement('div');slotSel.className='row';
+    slotSel.innerHTML='<label>Slot</label><select class="sb" id="lsSlot">'+[0,1,2,3].map(i=>`<option value="${i}">User ${i+1}${S.lsUser[i]?' · '+esc(S.lsUser[i].name):''}</option>`).join('')+'</select>';dw.appendChild(slotSel);
+    const slot=()=>+slotSel.querySelector('select').value;
+    const put=(i,tb)=>{pushUndo();S.lsUser[i]={name:tb.name,fr:tb.fr,b64:tb.b64};P.a_table=4+i;P.a_pos=0;EB.syncTables();dirty();changed();mountInst(t);toast('Loaded “'+tb.name+'” ('+tb.fr+' frames) into User '+(i+1))};
+    const br=document.createElement('div');br.className='btnrow';br.innerHTML='<button class="mini">Import .wav…</button>';dw.appendChild(br);
+    br.firstChild.onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.wav,audio/*';inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{const tb=await wtReadFile(f);if(!tb)throw new Error('not readable');put(slot(),tb)}catch(e){toast('Could not read that file')}};inp.click()};
+    if(WT_LIB.length){const r=document.createElement('div');r.className='row';r.innerHTML='<label>Library</label><select class="sb"><option value="">Choose a table…</option>'+WT_LIB.map((w,i)=>`<option value="${i}">${esc(w.name)} (${w.fr})</option>`).join('')+'</select>';
+      r.querySelector('select').onchange=e=>{if(e.target.value!=='')put(slot(),WT_LIB[+e.target.value])};dw.appendChild(r)}
+    const h=document.createElement('div');h.className='hint';h.textContent='Four user slots are shared by every native track in this project. They are saved with the project.';dw.appendChild(h)}
+  const ds=sec('Sub and filter');
+  rows(ds,[sp('sub','Sub',0,1,'pct'),sp('rnd','Random phase',0,1,'pct')]);
+  sel(ds,'Filter',  'ftype',['Ladder 24','Ladder 12','Band','High']);
+  rows(ds,[sp('cut','Cutoff',20,20000,'hz',{log:1}),sp('res','Resonance',0,1,'pct'),sp('fdrive','Drive',1,4,'x'),sp('fenv','Env amount',-1,1,'pct'),sp('fkey','Key tracking',0,1,'pct'),
+    sp('fa','Filter attack',.001,10,'sm',{log:1}),sp('fd','Filter decay',.001,10,'sm',{log:1}),sp('fs','Filter sustain',0,1,'pct'),sp('fr','Filter release',.001,10,'sm',{log:1}),sp('poslenv','Position by env',-1,1,'pct')]);
+  const da=sec('Amp, voice, distortion');
+  rows(da,[sp('aa','Attack',.001,10,'sm',{log:1}),sp('ad','Decay',.001,10,'sm',{log:1}),sp('as','Sustain',0,1,'pct'),sp('ar','Release',.001,10,'sm',{log:1})]);
+  da.appendChild(selRow('Mono',{'0':'Polyphonic','1':'Mono'},String(cur('mono')),v=>{P.mono=+v;dirty();changed()}));
+  rows(da,[sp('glide','Glide',0,2,'s'),sp('bend','Bend range',0,24,'n',{step:1}),sp('vel','Velocity',0,1,'pct')]);
+  sel(da,'Distortion','dtype',['Soft','Hard','Fold']);
+  rows(da,[sp('dist','Amount',0,1,'pct'),sp('master','Level',0,1,'pct')]);
+  const dl=sec('LFOs');
+  [1,2,3].forEach(i=>{const h=document.createElement('div');h.className='hint';h.style.margin='6px 0 0';h.textContent='LFO '+i;dl.appendChild(h);
+    sel(dl,'Shape','l'+i+'_shape',LS_SHAPES);dl.appendChild(selRow('Rate mode',{'0':'Free (Hz)','1':'Tempo sync'},String(cur('l'+i+'_sync')),v=>{P['l'+i+'_sync']=+v;dirty();changed()}));
+    rows(dl,[sp('l'+i+'_rate','Rate',.02,40,'hzr',{log:1})]);sel(dl,'Division','l'+i+'_div',LS_DIVS)});
+  const dm=sec('Modulation matrix','8 slots');
+  for(let i=1;i<=8;i++){
+    const row=document.createElement('div');row.className='row';row.style.gap='4px';
+    const opt=(arr,k)=>arr.map((n,j)=>`<option value="${j}"${j===cur(k)?' selected':''}>${n}</option>`).join('');
+    const a=cur('m'+i+'_amt');
+    row.innerHTML=`<label style="min-width:14px">${i}</label><select class="sb" style="flex:1;min-width:0">${opt(LS_SRCS,'m'+i+'_src')}</select><select class="sb" style="flex:1;min-width:0">${opt(LS_DSTS,'m'+i+'_dst')}</select>
+      <input type="range" min="-1000" max="1000" value="${Math.round(a*1000)}" style="flex:1;min-width:0"><span style="min-width:34px;text-align:right">${Math.round(a*100)}%</span>`;
+    const [s1,s2]=row.querySelectorAll('select'),rg=row.querySelector('input'),lb=row.querySelector('span');
+    s1.onchange=()=>{pushUndo();P['m'+i+'_src']=+s1.value;dirty();changed()};s2.onchange=()=>{pushUndo();P['m'+i+'_dst']=+s2.value;dirty();changed()};
+    rg.addEventListener('pointerdown',pushUndo);rg.oninput=()=>{P['m'+i+'_amt']=rg.value/1000;lb.textContent=Math.round(rg.value/10)+'%';dirty();changed()};
+    rg.ondblclick=()=>{rg.value=0;rg.oninput()};
+    dm.appendChild(row);
+  }
+  const de=sec('Engine');
+  {const r=document.createElement('div');r.className='row';r.innerHTML=`<label title="Moves the native tracks earlier or later against the other tracks">Sync offset</label><input type="range" min="-60" max="200" step="1" value="${EB.offset}"><span>${EB.offset} ms</span>`;
+    const rg=r.querySelector('input'),lb=r.querySelector('span');rg.oninput=()=>{EB.offset=+rg.value;lb.textContent=EB.offset+' ms';try{localStorage.setItem('loopstudio.lsoff',String(EB.offset))}catch(e){}};rg.ondblclick=()=>{rg.value=0;rg.oninput()};de.appendChild(r);
+    const h=document.createElement('div');h.className='hint';h.textContent='If the native tracks sound early or late against the other tracks, move this until the kick lines up. It applies the next time you press play.';de.appendChild(h);
+    const b=document.createElement('div');b.className='btnrow';b.innerHTML='<button class="mini">▶ Audition</button><button class="mini">All notes off</button>';b.children[0].onclick=()=>auditionTrack(t,60,1);b.children[1].onclick=()=>{if(EB.ready())EB.send({cmd:'panic'})};de.appendChild(b)}
+  const hint=document.createElement('div');hint.className='hint';hint.textContent='Plays in the native engine. The track fader, pan, mute and solo work. Inserts, sends, automation and export do not reach it yet.';box.appendChild(hint);
+}
 
 </script>

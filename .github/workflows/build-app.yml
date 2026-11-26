@@ -27,6 +27,20 @@ jobs:
       - name: Copy the app page
         shell: bash
         run: mkdir -p www && cp ../www/index.html www/index.html
+      - name: Add the native audio engine (latest Loop Engine build)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p engine-bin
+          if [ "$RUNNER_OS" = "Windows" ]; then ASSET=LoopEngine-Windows.zip; else ASSET=LoopEngine-macOS.zip; fi
+          if gh release download engine-latest --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir engine-dl; then
+            unzip -o engine-dl/"$ASSET" -d engine-bin
+            ls -la engine-bin
+          else
+            echo "No engine build yet: the app is built without it"
+            echo "none" > engine-bin/README.txt
+          fi
       - name: Install
         run: npm install
       - name: Build
