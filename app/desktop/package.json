@@ -21,7 +21,7 @@
     "extraResources": [{ "from": "engine-bin", "to": "engine", "filter": ["**/*"] }],
     "win": { "target": ["nsis", "portable"] },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.music", "identity": null },
+    "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.music", "identity": null, "x64ArchFiles": "Contents/Resources/engine/*" },
     "artifactName": "${productName}-${version}-${os}.${ext}"
   }
 }

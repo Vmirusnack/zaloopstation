@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -S engine -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S engine -B build -DCMAKE_BUILD_TYPE=Release ${{ runner.os == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' || '' }}
 
       - name: Build
         run: cmake --build build --config Release --parallel
