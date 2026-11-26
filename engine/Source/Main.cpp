@@ -8,6 +8,32 @@ namespace
 {
 constexpr const char* kVersion = "0.1.0";
 
+std::vector<std::string> gUnsupported;   // effect types the engine does not have yet (filled while a project is read)
+
+le::FxSpec fxFromJson (const juce::var& fv)
+{
+    le::FxSpec f;
+    const auto type = fv.getProperty ("type", "").toString().toStdString();
+    f.init (le::fxTypeFromName (type));
+    if (f.type == le::FxType::None) gUnsupported.push_back (type);
+    f.on = (bool) fv.getProperty ("on", true);
+    if (auto* po = fv.getProperty ("p", {}).getDynamicObject())
+        for (const auto& kv : po->getProperties())
+        {
+            const auto k = kv.name.toString().toStdString();
+            if (kv.value.isString()) f.setStr (k, kv.value.toString().toStdString());
+            else if (kv.value.isBool()) f.setNum (k, (bool) kv.value ? 1.0 : 0.0);
+            else if (kv.value.isDouble() || kv.value.isInt() || kv.value.isInt64()) f.setNum (k, (double) kv.value);
+        }
+    return f;
+}
+std::vector<le::FxSpec> fxListFromJson (const juce::var& v)
+{
+    std::vector<le::FxSpec> out;
+    if (auto* arr = v.getArray()) for (const auto& fv : *arr) out.push_back (fxFromJson (fv));
+    return out;
+}
+
 le::Project projectFromJson (const juce::var& v)
 {
     le::Project p;
@@ -34,8 +60,20 @@ le::Project projectFromJson (const juce::var& v)
                                 c.notes.push_back ({ (double) (*a)[1], (double) (*a)[2], (int) (*a)[0], a->size() > 3 ? (float) (double) (*a)[3] : 0.8f });
                     t.clips.push_back (std::move (c));
                 }
+            t.fx = fxListFromJson (tv.getProperty ("fx", {}));
+            if (auto* so = tv.getProperty ("sends", {}).getDynamicObject())
+                for (const auto& kv : so->getProperties()) t.sends.push_back ({ kv.name.toString().getIntValue(), (float) (double) kv.value });
             p.tracks.push_back (std::move (t));
         }
+    if (auto* arr = v.getProperty ("buses", {}).getArray())
+        for (const auto& bv : *arr)
+        {
+            le::Bus b; b.id = (int) bv.getProperty ("id", 0); b.name = bv.getProperty ("name", "").toString().toStdString();
+            b.gain = (float) (double) bv.getProperty ("gain", 1.0); b.pan = (float) (double) bv.getProperty ("pan", 0.0); b.mute = (bool) bv.getProperty ("mute", false);
+            b.fx = fxListFromJson (bv.getProperty ("fx", {}));
+            p.buses.push_back (std::move (b));
+        }
+    p.masterFx = fxListFromJson (v.getProperty ("masterFx", {}));
     return p;
 }
 
@@ -148,7 +186,12 @@ private:
                              { "device", d ? d->getName() : juce::String() }, { "sampleRate", d ? d->getCurrentSampleRate() : 0.0 },
                              { "buffer", d ? d->getCurrentBufferSizeSamples() : 0 }, { "latencyMs", d ? 1000.0 * d->getOutputLatencyInSamples() / std::max (1.0, d->getCurrentSampleRate()) : 0.0 } }));
             }
-            else if (cmd == "project") app.setProject (m.getProperty ("project", {}));
+            else if (cmd == "project")
+            {
+                gUnsupported.clear(); app.setProject (m.getProperty ("project", {}));
+                juce::Array<juce::var> un; for (const auto& u : gUnsupported) un.addIfNotAlreadyThere (juce::String (u));
+                if (! un.isEmpty()) send (obj ({ { "t", "unsupported" }, { "effects", un } }));
+            }
             else if (cmd == "play") r.play ((int) std::llround ((double) m.getProperty ("delayMs", 0.0) * r.sampleRateNow() / 1000.0));
             else if (cmd == "wavetable")
             {

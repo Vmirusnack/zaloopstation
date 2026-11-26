@@ -34,3 +34,12 @@ Commands to the engine: `hello`, `project`, `play`, `stop`, `seek {beats}`, `pan
 From the engine: `hello` (device, sample rate, buffer, output latency), and `state` about 30 times a second: `{playing, pos (beats), master:[l,r], tracks:[peak]}`.
 
 Run: `LoopEngine --port 47821 --buffer 256`.
+
+## Status (stage 3 work)
+
+* Mixer in the engine: inserts per track and bus, sends to buses (post-fader), bus fader and pan, master fader then master inserts (`engine/Source/Core.h`).
+* Built-in effects in C++ (`engine/Source/Fx.h`, tests in `engine/test/fx_test.cpp`): Channel EQ, Compressor, Echo, Limiter (look-ahead, hard ceiling), Filter, Reverb, Chorus, Phaser, Tremolo, Distortion.
+* Not in C++ yet (the engine skips them and tells the page): Pro EQ, OTT, tuner, Key Harmonizer, ladder filter, compressor styles other than "clean", side-chain.
+* Plugin delay compensation is not done: the limiter's look-ahead (1.5 ms) is not compensated yet.
+
+Protocol additions: `project` now also carries `buses:[{id,name,gain,pan,mute,fx}]`, `masterFx:[...]`, and per track `fx:[{type,on,p:{...}}]`, `sends:{busId:level}`. The engine answers `{t:"unsupported",effects:[...]}` when a project uses effects it does not have.

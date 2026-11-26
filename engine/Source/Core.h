@@ -3,6 +3,7 @@
 // Everything that runs on the audio thread (Renderer::process) takes no locks and allocates nothing.
 #pragma once
 #include "../../synth/Source/Dsp.h"
+#include "Fx.h"
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -11,6 +12,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace le
@@ -26,7 +28,10 @@ struct Track
     float pan = 0.0f;            // -1 .. 1
     bool mute = false, solo = false;
     std::vector<Clip> clips;
+    std::vector<FxSpec> fx;                          // inserts, before the fader
+    std::vector<std::pair<int, float>> sends;        // (bus id, level), after the fader
 };
+struct Bus { int id = 0; std::string name; float gain = 1.0f, pan = 0.0f; bool mute = false; std::vector<FxSpec> fx; };
 struct Project
 {
     double bpm = 140.0;
@@ -34,6 +39,8 @@ struct Project
     double loopStart = 0.0, loopEnd = 16.0;   // beats
     float master = 1.0f;
     std::vector<Track> tracks;
+    std::vector<Bus> buses;
+    std::vector<FxSpec> masterFx;                    // after the master fader
 };
 
 // Loop Synth parameter by its plugin parameter id (same names as in the VST3), e.g. "a_table", "cut", "l1_rate", "m1_amt"
@@ -70,7 +77,7 @@ inline bool setSynthParam (ls::P& p, const std::string& id, float v)
 class Renderer
 {
 public:
-    static constexpr int kMaxTracks = 256;
+    static constexpr int kMaxTracks = 256, kMaxBuses = 32;
 
     Renderer() : tables (std::make_shared<ls::Tables>()) {}
 
@@ -80,7 +87,7 @@ public:
         accL.assign ((size_t) blockMax, 0.0); accR.assign ((size_t) blockMax, 0.0);
         smoothCoef = 1.0 - std::exp (-1.0 / (0.004 * sr));
         std::lock_guard<std::mutex> lk (mtx);
-        pool.clear(); plan.store (nullptr); plans.clear(); cur = nullptr;
+        pool.clear(); busPool.clear(); fxPool.clear(); plan.store (nullptr); plans.clear(); cur = nullptr;
     }
 
     // ---- message thread ------------------------------------------------------------------------------------------
@@ -95,12 +102,31 @@ public:
         pl->proj.tracks.resize ((size_t) nt);
         pl->ev.resize ((size_t) nt);
         pl->rt.resize ((size_t) nt);
+        pl->tfx.resize ((size_t) nt);
+        pl->sends.resize ((size_t) nt);
+        FxMap nextFx;
+        const int nb = std::min ((int) pl->proj.buses.size(), kMaxBuses);
+        pl->proj.buses.resize ((size_t) nb);
+        pl->brt.resize ((size_t) nb); pl->bfx.resize ((size_t) nb);
+        for (int b = 0; b < nb; ++b)
+        {
+            const auto& bs = pl->proj.buses[(size_t) b];
+            auto& br = busPool[bs.id];
+            if (! br) { br = std::make_unique<BusRt>(); br->l.assign ((size_t) blockMax, 0.0); br->r.assign ((size_t) blockMax, 0.0); br->fl.assign ((size_t) blockMax, 0.0f); br->fr.assign ((size_t) blockMax, 0.0f); }
+            pl->brt[(size_t) b] = br.get();
+            pl->bfx[(size_t) b] = fxChain (bs.fx, 2, bs.id, nextFx);
+        }
+        pl->mfx = fxChain (pl->proj.masterFx, 3, 0, nextFx);
         for (int i = 0; i < nt; ++i)
         {
             const auto& t = pl->proj.tracks[(size_t) i];
             auto& rt = pool[t.id];
             if (! rt) { rt = std::make_unique<TrackRt>(); rt->synth = std::make_unique<ls::Synth> (tables); rt->synth->prepare (sr); rt->sl.assign ((size_t) blockMax, 0.0f); rt->sr_.assign ((size_t) blockMax, 0.0f); }
             pl->rt[(size_t) i] = rt.get();
+            pl->tfx[(size_t) i] = fxChain (t.fx, 1, t.id, nextFx);
+            for (const auto& sd : t.sends)
+                for (int b = 0; b < nb; ++b)
+                    if (pl->proj.buses[(size_t) b].id == sd.first && sd.second > 0.0f) pl->sends[(size_t) i].push_back ({ b, sd.second });
             auto& ev = pl->ev[(size_t) i];
             for (const auto& c : t.clips)
                 for (const auto& n : c.notes)
@@ -114,6 +140,7 @@ public:
         }
         pl->loopStart = (int64_t) std::llround (pl->proj.loopStart * pl->spb);
         pl->loopEnd = std::max (pl->loopStart + 1, (int64_t) std::llround (pl->proj.loopEnd * pl->spb));
+        fxPool = std::move (nextFx);
         const Plan* raw = pl.get();
         plans.push_back (std::move (pl));
         plan.store (raw, std::memory_order_release);
@@ -149,7 +176,7 @@ public:
         if (pl != cur)
         {
             if (cur != nullptr && pl != nullptr && cur->spb != pl->spb) pos = (int64_t) std::llround ((double) pos / cur->spb * pl->spb);
-            cur = pl; for (auto& s : sm) s = {};
+            cur = pl; for (auto& s : sm) s = {}; for (auto* b : pl->brt) b->sm = {};
         }
         if (cur == nullptr) { std::memset (L, 0, sizeof (float) * (size_t) n); std::memset (R, 0, sizeof (float) * (size_t) n); return; }
         const Plan& P = *cur;
@@ -170,6 +197,7 @@ public:
             liveR.store (r + 1, std::memory_order_release);
         }
 
+        for (auto* b : P.brt) { std::fill (b->l.begin(), b->l.begin() + n, 0.0); std::fill (b->r.begin(), b->r.begin() + n, 0.0); }
         bool anySolo = false; for (const auto& t : P.proj.tracks) anySolo = anySolo || t.solo;
 
         int done = 0;
@@ -185,14 +213,30 @@ public:
             if (adv && P.proj.loop && pos >= P.loopEnd) { pos = P.loopStart; for (auto* r : P.rt) r->synth->allOff(); }
         }
 
-        // master
+        // buses: inserts, fader and pan, then into the master mix
+        for (size_t bi = 0; bi < P.brt.size(); ++bi)
+        {
+            BusRt& b = *P.brt[bi]; const Bus& bs = P.proj.buses[bi];
+            for (int i = 0; i < n; ++i) { b.fl[(size_t) i] = (float) b.l[(size_t) i]; b.fr[(size_t) i] = (float) b.r[(size_t) i]; }
+            runChain (P.bfx[bi], bs.fx, b.fl.data(), b.fr.data(), n);
+            const double a = (std::clamp ((double) bs.pan, -1.0, 1.0) + 1.0) * ls::kPi * 0.25, tgl = bs.mute ? 0.0 : bs.gain * std::cos (a) * 1.41421356237, tgr = bs.mute ? 0.0 : bs.gain * std::sin (a) * 1.41421356237;
+            if (! b.sm.init) { b.sm.gl = tgl; b.sm.gr = tgr; b.sm.init = true; }
+            for (int i = 0; i < n; ++i)
+            {
+                b.sm.gl += (tgl - b.sm.gl) * smoothCoef; b.sm.gr += (tgr - b.sm.gr) * smoothCoef;
+                accL[(size_t) i] += b.fl[(size_t) i] * b.sm.gl; accR[(size_t) i] += b.fr[(size_t) i] * b.sm.gr;
+            }
+        }
+
+        // master fader, then the master inserts (the limiter normally sits last)
         const double mt = P.proj.master; float pl_ = 0, pr_ = 0;
         for (int i = 0; i < n; ++i)
         {
             mGain += (mt - mGain) * smoothCoef;
-            const float l = (float) (accL[(size_t) i] * mGain), r = (float) (accR[(size_t) i] * mGain);
-            L[i] = l; R[i] = r; pl_ = std::max (pl_, std::fabs (l)); pr_ = std::max (pr_, std::fabs (r));
+            L[i] = (float) (accL[(size_t) i] * mGain); R[i] = (float) (accR[(size_t) i] * mGain);
         }
+        runChain (P.mfx, P.proj.masterFx, L, R, n);
+        for (int i = 0; i < n; ++i) { pl_ = std::max (pl_, std::fabs (L[i])); pr_ = std::max (pr_, std::fabs (R[i])); }
         maxStore (mPeakL, pl_); maxStore (mPeakR, pr_);
         posBeats.store ((double) pos / P.spb);
     }
@@ -200,8 +244,35 @@ public:
 private:
     struct Ev { int64_t sample; int pitch; float vel; bool on; };
     struct TrackRt { std::unique_ptr<ls::Synth> synth; std::vector<float> sl, sr_; };
-    struct Plan { Project proj; double spb = 1; int64_t loopStart = 0, loopEnd = 1; std::vector<std::vector<Ev>> ev; std::vector<TrackRt*> rt; };
     struct Smooth { double gl = 0, gr = 0; bool init = false; };
+    struct BusRt { std::vector<double> l, r; std::vector<float> fl, fr; Smooth sm; };
+    using FxChain = std::vector<std::shared_ptr<Fx>>;
+    struct Plan
+    {
+        Project proj; double spb = 1; int64_t loopStart = 0, loopEnd = 1;
+        std::vector<std::vector<Ev>> ev; std::vector<TrackRt*> rt;
+        std::vector<FxChain> tfx, bfx; FxChain mfx; std::vector<BusRt*> brt; std::vector<std::vector<std::pair<int, float>>> sends;
+    };
+    using FxMap = std::unordered_map<int64_t, std::pair<FxType, std::shared_ptr<Fx>>>;
+    // effect instances keep their state across project updates when the type in the same slot stays the same
+    FxChain fxChain (const std::vector<FxSpec>& specs, int kind, int id, FxMap& next)
+    {
+        FxChain out;
+        for (size_t i = 0; i < specs.size(); ++i)
+        {
+            const int64_t key = ((int64_t) kind << 56) ^ ((int64_t) id << 16) ^ (int64_t) i;
+            std::shared_ptr<Fx> f;
+            auto it = fxPool.find (key);
+            if (it != fxPool.end() && it->second.first == specs[i].type) f = it->second.second; else f = makeFx (specs[i].type, sr);
+            if (f) next[key] = { specs[i].type, f };
+            out.push_back (f);
+        }
+        return out;
+    }
+    static void runChain (const FxChain& c, const std::vector<FxSpec>& specs, float* l, float* r, int n)
+    {
+        for (size_t k = 0; k < c.size() && k < specs.size(); ++k) if (c[k] && specs[k].on) c[k]->process (l, r, n, specs[k]);
+    }
     struct LiveEv { int track; int pitch; float vel; bool on; };
     static constexpr unsigned kLive = 256;
 
@@ -228,6 +299,7 @@ private:
                 }
             }
             if (seg > c) rt.synth->render (tl + c, tr + c, seg - c, t.synth);
+            runChain (P.tfx[ti], t.fx, tl, tr, seg);
 
             // fader and pan (constant power, -3 dB at the centre like Logic), smoothed per sample
             const bool audible = ! t.mute && (! anySolo || t.solo);
@@ -241,6 +313,7 @@ private:
                 s.gl += (tgl - s.gl) * smoothCoef; s.gr += (tgr - s.gr) * smoothCoef;
                 const double l = tl[i] * s.gl, r = tr[i] * s.gr;
                 accL[(size_t) (off + i)] += l; accR[(size_t) (off + i)] += r;
+                for (const auto& sd : P.sends[ti]) { auto* b = P.brt[(size_t) sd.first]; b->l[(size_t) (off + i)] += l * sd.second; b->r[(size_t) (off + i)] += r * sd.second; }
                 pk = std::max (pk, (float) std::max (std::fabs (l), std::fabs (r)));
             }
             maxStore (tPeak[ti], pk);
@@ -251,6 +324,8 @@ private:
     std::shared_ptr<ls::Tables> tables;
     std::mutex mtx;
     std::unordered_map<int, std::unique_ptr<TrackRt>> pool;
+    std::unordered_map<int, std::unique_ptr<BusRt>> busPool;
+    FxMap fxPool;
     std::vector<std::unique_ptr<Plan>> plans;
     std::atomic<const Plan*> plan { nullptr };
     const Plan* cur = nullptr;

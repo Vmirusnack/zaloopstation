@@ -8952,15 +8952,20 @@ EB.avail=()=>!!(window.loopEngine&&window.loopEngine.available);
 EB.has=()=>S.tracks.some(t=>t.type==='ls');
 EB.ready=()=>EB.avail()&&EB.on&&!!EB.info;
 EB.send=o=>{try{window.loopEngine.send(o)}catch(e){}};
+EB.fxList=a=>(a||[]).map(f=>({type:f.type,on:f.on!==false,p:f.p||{}}));
+EB.sendMap=t=>{const o={};Object.entries(t.sends||{}).forEach(([k,v])=>{if(v>0)o[k]=v});return o};
 EB.build=()=>{
   const anySolo=S.tracks.some(t=>t.solo);
   const tracks=S.tracks.filter(t=>t.type==='ls').map(t=>{
     const notes=[];
     t.regions.forEach(r=>{if(r.clip||r.mute)return;midiEvents(t,r).forEach(e=>notes.push([e.p,+e.abs.toFixed(4),+Math.max(.02,e.dur).toFixed(4),+(e.v/127).toFixed(3)]))});
     notes.sort((a,b)=>a[1]-b[1]);
-    return {id:t.id,name:t.name,gain:fg(t.vol),pan:t.pan||0,mute:!!t.mute||(anySolo&&!t.solo),solo:false,synth:lsFull(t),clips:[{start:0,len:BARS*4+16,notes}]};
+    return {id:t.id,name:t.name,gain:fg(t.vol),pan:t.pan||0,mute:!!t.mute||(anySolo&&!t.solo),solo:false,synth:lsFull(t),clips:[{start:0,len:BARS*4+16,notes}],fx:EB.fxList(t.fx),sends:EB.sendMap(t)};
   });
-  return {bpm:S.bpm,master:fg(S.master),loop:{on:!!S.cycle&&S.cycleEnd>S.cycleStart,start:S.cycleStart,end:S.cycleEnd},tracks};
+  const buses=S.buses.map(b=>({id:b.id,name:b.name||'',gain:fg(b.vol),pan:b.pan||0,mute:!!b.mute,fx:EB.fxList(b.fx)}));
+  // the glue compressor of the page (on by default) is the first master insert
+  const masterFx=(S.noGlue?[]:[{type:'comp',on:true,p:{thr:-10,knee:14,ratio:3,att:3,rel:250}}]).concat(EB.fxList(S.masterFx));
+  return {bpm:S.bpm,master:fg(S.master),loop:{on:!!S.cycle&&S.cycleEnd>S.cycleStart,start:S.cycleStart,end:S.cycleEnd},tracks,buses,masterFx};
 };
 EB.flush=force=>{
   if(!EB.ready())return;EB.dirty=false;
@@ -8982,6 +8987,7 @@ EB.msg=m=>{
   if(m.t==='hello'){EB.info=m;EB.on=true;EB.err='';EB.last='';EB.tbSent=['','','',''];EB.syncTables();EB.flush(true);EB.paint();
     if(S.playing)EB.startPlay()}
   else if(m.t==='state'){const p=m.master||[0,0];EB.peak=Math.max(p[0]||0,p[1]||0);EB.paintMeter()}
+  else if(m.t==='unsupported'){const k=(m.effects||[]).join(', ');if(k!==EB.warned){EB.warned=k;try{toast('Native engine skips effects it does not have yet: '+k)}catch(e){}}}
   else if(m.t==='wavetable'&&m.error){try{toast('Wavetable not loaded: '+m.error)}catch(e){}}
   else if(m.t==='closed'||m.t==='exit'){EB.on=false;EB.info=null;EB.last='';EB.err=m.t==='exit'?'The engine stopped'+(m.err?': '+String(m.err).slice(-160):''):'The engine connection closed';EB.paint()}
 };

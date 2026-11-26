@@ -94,6 +94,30 @@ int main (int argc, char** argv)
         std::printf ("      delayed start: first sample %zu (asked 4800)\n", first);
         CHECK (first >= 4800 && first < 4800 + 64, "play with a delay starts the song that many samples later");
     }
+    // 8. mixer: send to a bus, bus fader, insert on a track, master limiter
+    {
+        auto mk = [&] { le::Project p; p.bpm = 120; p.tracks.push_back (synthTrack (1, 57, 0.0, 1.0)); return p; };
+        std::vector<float> L, R;
+        auto base = mk(); le::renderOffline (base, sr, 256, 1.5, L, R); const double rBase = rms (L, 2000, 20000);
+        // a send at 0.5 to a bus at unity adds half of the track again
+        auto p = mk(); le::Bus b; b.id = 7; p.buses.push_back (b); p.tracks[0].sends.push_back ({ 7, 0.5f });
+        le::renderOffline (p, sr, 256, 1.5, L, R); CHECK (std::fabs (rms (L, 2000, 20000) / rBase - 1.5) < 0.05, "send to a bus adds the sent level");
+        p.buses[0].mute = true; le::renderOffline (p, sr, 256, 1.5, L, R); CHECK (std::fabs (rms (L, 2000, 20000) / rBase - 1.0) < 0.02, "a muted bus adds nothing");
+        // a track insert (low-pass 200 Hz) takes the level of a bright note down
+        auto q = mk(); le::FxSpec f; f.init (le::FxType::Filter); f.setNum ("cut", 60); q.tracks[0].fx.push_back (f);
+        le::renderOffline (q, sr, 256, 1.5, L, R); CHECK (rms (L, 2000, 20000) < rBase * 0.7, "track insert is applied");
+        q.tracks[0].fx[0].on = false; le::renderOffline (q, sr, 256, 1.5, L, R); CHECK (std::fabs (rms (L, 2000, 20000) / rBase - 1.0) < 0.001, "a bypassed insert changes nothing");
+        // master limiter with a ceiling of -12 dB keeps the output below it even with the fader up
+        auto m = mk(); m.master = 4.0f; le::FxSpec lim; lim.init (le::FxType::Limiter); lim.setNum ("ceil", -12); m.masterFx.push_back (lim);
+        le::renderOffline (m, sr, 256, 1.5, L, R); double pk = 0; for (float v : L) pk = std::max (pk, (double) std::fabs (v));
+        std::printf ("      master limiter peak %.4f (ceiling %.4f)\n", pk, std::pow (10.0, -12.0 / 20.0));
+        CHECK (pk <= std::pow (10.0, -12.0 / 20.0) + 1e-5 && pk > 0.1, "master limiter holds the ceiling");
+        // same result for different block sizes with effects
+        auto e = mk(); le::FxSpec rv; rv.init (le::FxType::Reverb); rv.setNum ("mix", 0.4); e.tracks[0].fx.push_back (rv);
+        std::vector<float> A, Ar, B2, Br; le::renderOffline (e, sr, 64, 1.5, A, Ar); le::renderOffline (e, sr, 480, 1.5, B2, Br);
+        double md = 0; for (size_t i = 0; i < A.size(); ++i) md = std::max (md, (double) std::fabs (A[i] - B2[i]));
+        CHECK (md < 1e-3, "effects give the same result for different block sizes");
+    }
     if (argc > 1)
     {
         le::Project p; p.bpm = 150; p.loop = true; p.loopEnd = 4; auto b = synthTrack (1, 38, 0.0, 0.4, 4); b.synth.a.table = 1; b.synth.cut = 600; b.gain = 0.9f;
