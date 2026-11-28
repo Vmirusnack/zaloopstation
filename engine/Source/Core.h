@@ -4,6 +4,7 @@
 #pragma once
 #include "../../synth/Source/Dsp.h"
 #include "Fx.h"
+#include "Inst.h"
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +25,7 @@ struct Track
     int id = 0;
     std::string name;
     ls::P synth;                 // Loop Synth parameters of this track's instrument
+    InstSpec inst;               // when inst.type is not None the track plays this built-in instrument instead of Loop Synth
     float gain = 1.0f;           // linear fader value
     float pan = 0.0f;            // -1 .. 1
     bool mute = false, solo = false;
@@ -103,6 +105,8 @@ public:
         pl->ev.resize ((size_t) nt);
         pl->rt.resize ((size_t) nt);
         pl->tfx.resize ((size_t) nt);
+        pl->inst.resize ((size_t) nt);
+        InstMap nextInst;
         pl->sends.resize ((size_t) nt);
         FxMap nextFx;
         const int nb = std::min ((int) pl->proj.buses.size(), kMaxBuses);
@@ -124,6 +128,12 @@ public:
             if (! rt) { rt = std::make_unique<TrackRt>(); rt->synth = std::make_unique<ls::Synth> (tables); rt->synth->prepare (sr); rt->sl.assign ((size_t) blockMax, 0.0f); rt->sr_.assign ((size_t) blockMax, 0.0f); }
             pl->rt[(size_t) i] = rt.get();
             pl->tfx[(size_t) i] = fxChain (t.fx, 1, t.id, nextFx);
+            if (t.inst.type != InstType::None)
+            {
+                std::shared_ptr<Inst> in; auto it = instPool.find (t.id);
+                if (it != instPool.end() && it->second.first == t.inst.type) in = it->second.second; else in = makeInst (t.inst.type, sr);
+                nextInst[t.id] = { t.inst.type, in }; pl->inst[(size_t) i] = in;
+            }
             for (const auto& sd : t.sends)
                 for (int b = 0; b < nb; ++b)
                     if (pl->proj.buses[(size_t) b].id == sd.first && sd.second > 0.0f) pl->sends[(size_t) i].push_back ({ b, sd.second });
@@ -140,7 +150,7 @@ public:
         }
         pl->loopStart = (int64_t) std::llround (pl->proj.loopStart * pl->spb);
         pl->loopEnd = std::max (pl->loopStart + 1, (int64_t) std::llround (pl->proj.loopEnd * pl->spb));
-        fxPool = std::move (nextFx);
+        fxPool = std::move (nextFx); instPool = std::move (nextInst);
         const Plan* raw = pl.get();
         plans.push_back (std::move (pl));
         plan.store (raw, std::memory_order_release);
@@ -181,11 +191,11 @@ public:
         if (cur == nullptr) { std::memset (L, 0, sizeof (float) * (size_t) n); std::memset (R, 0, sizeof (float) * (size_t) n); return; }
         const Plan& P = *cur;
 
-        if (panicReq.exchange (false)) for (auto* r : P.rt) r->synth->allOff();
+        if (panicReq.exchange (false)) allOffAll (P);
         const int pr = playReq.exchange (0);
         if (pr == 1 && ! playingA) { playingA = true; delayLeft = playDelay.load(); }
-        else if (pr == 2 && playingA) { playingA = false; delayLeft = 0; for (auto* r : P.rt) r->synth->allOff(); }
-        if (seekFlag.exchange (false)) { pos = (int64_t) std::llround (std::max (0.0, seekReqBeats.load()) * P.spb); for (auto* r : P.rt) r->synth->allOff(); }
+        else if (pr == 2 && playingA) { playingA = false; delayLeft = 0; allOffAll (P); }
+        if (seekFlag.exchange (false)) { pos = (int64_t) std::llround (std::max (0.0, seekReqBeats.load()) * P.spb); allOffAll (P); }
         isPlaying.store (playingA);
 
         // live notes arrive at the start of the block
@@ -193,7 +203,7 @@ public:
         {
             const LiveEv& e = live[r % kLive];
             for (size_t i = 0; i < P.rt.size(); ++i)
-                if (P.proj.tracks[i].id == e.track) { if (e.on) P.rt[i]->synth->noteOn (e.pitch, e.vel, P.proj.tracks[i].synth); else P.rt[i]->synth->noteOff (e.pitch); }
+                if (P.proj.tracks[i].id == e.track) { if (e.on) trkOn (P, i, e.pitch, e.vel); else trkOff (P, i, e.pitch); }
             liveR.store (r + 1, std::memory_order_release);
         }
 
@@ -210,7 +220,7 @@ public:
             renderSegment (P, anySolo, done, seg, adv);
             if (adv) pos += seg; else if (playingA) delayLeft -= seg;
             done += seg;
-            if (adv && P.proj.loop && pos >= P.loopEnd) { pos = P.loopStart; for (auto* r : P.rt) r->synth->allOff(); }
+            if (adv && P.proj.loop && pos >= P.loopEnd) { pos = P.loopStart; allOffAll (P); }
         }
 
         // buses: inserts, fader and pan, then into the master mix
@@ -251,9 +261,10 @@ private:
     {
         Project proj; double spb = 1; int64_t loopStart = 0, loopEnd = 1;
         std::vector<std::vector<Ev>> ev; std::vector<TrackRt*> rt;
-        std::vector<FxChain> tfx, bfx; FxChain mfx; std::vector<BusRt*> brt; std::vector<std::vector<std::pair<int, float>>> sends;
+        std::vector<FxChain> tfx, bfx; FxChain mfx; std::vector<std::shared_ptr<Inst>> inst; std::vector<BusRt*> brt; std::vector<std::vector<std::pair<int, float>>> sends;
     };
     using FxMap = std::unordered_map<int64_t, std::pair<FxType, std::shared_ptr<Fx>>>;
+    using InstMap = std::unordered_map<int, std::pair<InstType, std::shared_ptr<Inst>>>;
     // effect instances keep their state across project updates when the type in the same slot stays the same
     FxChain fxChain (const std::vector<FxSpec>& specs, int kind, int id, FxMap& next)
     {
@@ -269,6 +280,12 @@ private:
         }
         return out;
     }
+    // note and render dispatch: a track plays its built-in instrument when it has one, otherwise Loop Synth
+    static void trkOn (const Plan& P, size_t i, int pitch, float vel) { if (P.inst[i]) P.inst[i]->noteOn (pitch, vel, P.proj.tracks[i].inst); else P.rt[i]->synth->noteOn (pitch, vel, P.proj.tracks[i].synth); }
+    static void trkOff (const Plan& P, size_t i, int pitch) { if (P.inst[i]) P.inst[i]->noteOff (pitch); else P.rt[i]->synth->noteOff (pitch); }
+    static void trkAllOff (const Plan& P, size_t i) { if (P.inst[i]) P.inst[i]->allOff(); else P.rt[i]->synth->allOff(); }
+    static void allOffAll (const Plan& P) { for (size_t i = 0; i < P.rt.size(); ++i) trkAllOff (P, i); }
+    static void trkRender (const Plan& P, size_t i, float* l, float* r, int n) { if (P.inst[i]) P.inst[i]->render (l, r, n, P.proj.tracks[i].inst); else P.rt[i]->synth->render (l, r, n, P.proj.tracks[i].synth); }
     static void runChain (const FxChain& c, const std::vector<FxSpec>& specs, float* l, float* r, int n)
     {
         for (size_t k = 0; k < c.size() && k < specs.size(); ++k) if (c[k] && specs[k].on) c[k]->process (l, r, n, specs[k]);
@@ -294,11 +311,11 @@ private:
                 for (; it != ev.end() && it->sample < p1; ++it)
                 {
                     const int at = (int) (it->sample - p0);
-                    if (at > c) { rt.synth->render (tl + c, tr + c, at - c, t.synth); c = at; }
-                    if (it->on) rt.synth->noteOn (it->pitch, it->vel, t.synth); else rt.synth->noteOff (it->pitch);
+                    if (at > c) { trkRender (P, ti, tl + c, tr + c, at - c); c = at; }
+                    if (it->on) trkOn (P, ti, it->pitch, it->vel); else trkOff (P, ti, it->pitch);
                 }
             }
-            if (seg > c) rt.synth->render (tl + c, tr + c, seg - c, t.synth);
+            if (seg > c) trkRender (P, ti, tl + c, tr + c, seg - c);
             runChain (P.tfx[ti], t.fx, tl, tr, seg);
 
             // fader and pan (constant power, -3 dB at the centre like Logic), smoothed per sample
@@ -325,7 +342,7 @@ private:
     std::mutex mtx;
     std::unordered_map<int, std::unique_ptr<TrackRt>> pool;
     std::unordered_map<int, std::unique_ptr<BusRt>> busPool;
-    FxMap fxPool;
+    FxMap fxPool; InstMap instPool;
     std::vector<std::unique_ptr<Plan>> plans;
     std::atomic<const Plan*> plan { nullptr };
     const Plan* cur = nullptr;

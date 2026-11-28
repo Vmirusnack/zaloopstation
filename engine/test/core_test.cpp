@@ -118,6 +118,21 @@ int main (int argc, char** argv)
         double md = 0; for (size_t i = 0; i < A.size(); ++i) md = std::max (md, (double) std::fabs (A[i] - B2[i]));
         CHECK (md < 1e-3, "effects give the same result for different block sizes");
     }
+    // 9. built-in instruments on tracks: a kick track and a drum track play at their beats, and mix with a Loop Synth track
+    {
+        le::Project p; p.bpm = 120;
+        le::Track k; k.id = 1; k.inst.init (le::InstType::Kick); le::Clip c; c.len = 4; c.notes.push_back ({ 1.0, 0.25, 36, 1.0f }); k.clips.push_back (c);
+        le::Track d; d.id = 2; d.inst.init (le::InstType::Drums); le::Clip c2; c2.len = 4; c2.notes.push_back ({ 2.0, 0.25, 38, 1.0f }); d.clips.push_back (c2);
+        p.tracks = { k, d, synthTrack (3, 57, 3.0, 0.5) };
+        std::vector<float> L, R; le::renderOffline (p, sr, 256, 3.0, L, R);
+        CHECK (rms (L, 0, 20000) < 1e-6, "instrument tracks are silent before their first note");
+        CHECK (rms (L, 24000, 28000) > 0.02, "kick track sounds at beat 1");
+        CHECK (rms (L, 48000, 51000) > 0.01, "drum track sounds at beat 2");
+        CHECK (rms (L, 72000, 76000) > 0.005, "synth track mixes with instrument tracks");
+        std::vector<float> A, Ar, B, Br; le::renderOffline (p, sr, 64, 3.0, A, Ar); le::renderOffline (p, sr, 480, 3.0, B, Br);
+        double md = 0; for (size_t i = 0; i < A.size(); ++i) md = std::max (md, (double) std::fabs (A[i] - B[i]));
+        CHECK (md < 1e-3, "instrument tracks give the same result for different block sizes");
+    }
     if (argc > 1)
     {
         le::Project p; p.bpm = 150; p.loop = true; p.loopEnd = 4; auto b = synthTrack (1, 38, 0.0, 0.4, 4); b.synth.a.table = 1; b.synth.cut = 600; b.gain = 0.9f;

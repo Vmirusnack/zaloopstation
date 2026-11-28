@@ -43,3 +43,6 @@ Run: `LoopEngine --port 47821 --buffer 256`.
 * Plugin delay compensation is not done: the limiter's look-ahead (1.5 ms) is not compensated yet.
 
 Protocol additions: `project` now also carries `buses:[{id,name,gain,pan,mute,fx}]`, `masterFx:[...]`, and per track `fx:[{type,on,p:{...}}]`, `sends:{busId:level}`. The engine answers `{t:"unsupported",effects:[...]}` when a project uses effects it does not have.
+
+* Instruments in C++ (`engine/Source/Inst.h`, tests in `engine/test/inst_test.cpp`): Kick Designer (synth kick, not the sample pack yet), Drum Kit (standard and hard dance), Hard Synth (unison, FM, vibrato, dive, filter envelope, sub) with the oversampled drive/clip shaper. Track JSON: `inst:{type:"kick"|"drums"|"hard",p:{...}}`.
+* The page sends drums, synth kicks, Hard Synth and Loop Synth tracks to the engine when it runs inside the desktop app (Appearance > Native engine, on by default). Export still renders in the page. Not native yet: Acid, Bass/Pad/Keys/Synth, Wavetable Synth, Kick Builder, Kick sample pack, FX Riser, Slicer, audio tracks. They keep playing in the page, so a project mixes both engines until those are ported.

@@ -60,6 +60,17 @@ le::Project projectFromJson (const juce::var& v)
                                 c.notes.push_back ({ (double) (*a)[1], (double) (*a)[2], (int) (*a)[0], a->size() > 3 ? (float) (double) (*a)[3] : 0.8f });
                     t.clips.push_back (std::move (c));
                 }
+            if (auto* io = tv.getProperty ("inst", {}).getDynamicObject())
+            {
+                t.inst.init (le::instTypeFromName (io->getProperty ("type").toString().toStdString()));
+                if (auto* po = io->getProperty ("p").getDynamicObject())
+                    for (const auto& kv : po->getProperties())
+                    {
+                        const auto k = kv.name.toString().toStdString();
+                        if (kv.value.isString()) t.inst.setStr (k, kv.value.toString().toStdString());
+                        else if (kv.value.isDouble() || kv.value.isInt() || kv.value.isInt64() || kv.value.isBool()) t.inst.setNum (k, (double) kv.value);
+                    }
+            }
             t.fx = fxListFromJson (tv.getProperty ("fx", {}));
             if (auto* so = tv.getProperty ("sends", {}).getDynamicObject())
                 for (const auto& kv : so->getProperties()) t.sends.push_back ({ kv.name.toString().getIntValue(), (float) (double) kv.value });

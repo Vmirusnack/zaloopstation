@@ -17,6 +17,7 @@ jobs:
         run: |
           g++ -O2 -std=c++17 engine/test/core_test.cpp -o core_test && ./core_test
           g++ -O2 -std=c++17 engine/test/fx_test.cpp -o fx_test && ./fx_test
+          g++ -O2 -std=c++17 engine/test/inst_test.cpp -o inst_test && ./inst_test
           g++ -O2 -std=c++17 synth/test/dsp_test.cpp -o dsp_test && ./dsp_test
 
   build:
